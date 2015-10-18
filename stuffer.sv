@@ -26,15 +26,16 @@ module bitstuffing (clk, rst_b,
         else count <= (stream && ~swp) ? count + 1 : 0;
     end
     
-    assign swp = (count == 2'd6);  // if swp: insert a zero bit instead of reading from stream.
+    assign swp = (count == 3'd5);  // if swp: insert a zero bit instead of reading from stream.
     assign re = ~swp;              // else: read from stream
 
-    logic q_empty;
+    logic q_empty, q_out;
     fifo q (.clk(clk), .rst_b(rst_b), 
             .data_in(stream),
             .we(bstr_in_ready), .re(re),
-            .empty(q_empty), .data_out(bstr_out));
+            .empty(q_empty), .data_out(q_out));
 
+    assign bstr_out = (swp) ? 0 : q_out;
     assign bstr_out_ready = ~q_empty;
 
 endmodule
