@@ -71,7 +71,7 @@ module nrzi_ctrl(clk, rst_b,
 
     // use nrzi if we are in the packet data
     always_comb begin
-        if (bstr_in_ready && (counter < `TOK_S))
+        if (bstr_in_ready && (counter < counter_lim))
             use_nrzi = 1'b1;
         else use_nrzi = 1'b0;
     end

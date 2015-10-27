@@ -37,8 +37,22 @@ module bitstuffing (clk, rst_b,
             .we(bstr_in_avail), .re(re),
             .empty(q_empty), .data_out(q_out));
 
+    // store packet type as long as necessary
+    reg [1:0] p_type_stored;
+    logic [1:0] p_type_last;
+
+    always_comb begin
+        if (bstr_in_avail) p_type_last = bstr_in_ready;
+        else p_type_last = p_type_stored;
+    end
+
+    always_ff @(posedge clk, negedge rst_b) begin
+        if (~rst_b) p_type_stored <= 2'b0;
+        else p_type_stored <= p_type_last;
+    end
+
     assign bstr_out = (swp) ? 0 : q_out;
-    assign bstr_out_ready = (~q_empty) ? 2'b01 : 2'b0; // this should be type
+    assign bstr_out_ready = (~q_empty) ? p_type_last : 2'b0;
 
 endmodule
 
