@@ -6,19 +6,20 @@ module usbHost
    usbWires wires);
 
   /* Tasks needed to be finished to run testbenches */
+  logic [98:0] pkt;
+  logic pktInAvail;
 
   task prelabRequest();
       // sends an OUT packet with ADDR=5 and ENDP=4
       // packet should have SYNC and EOP too
-      logic [98:0] pkt;
-      logic pktInAvail;
-
+      
       $display("Sending an OUT packet....");
-      pkt[98:64] = 35'h0187a040;
+      pkt[98:64] = 35'h00c3d0200;
       pkt[63:0] = 64'd0;
       pktInAvail = 1'b1;
+      #20 pktInAvail = 1'b0;
 
-      #1000;
+      #100;
       $display("Returning from task prelabRequest");
   endtask: prelabRequest
 
@@ -48,8 +49,6 @@ module usbHost
   assign wires.DM = (we) ? dm_out : 1'bz;
 
   logic ready_in;
-  logic [98:0] pkt;
-  logic pktInAvail;
 
   prelab dut (clk, rst_L, pkt, pktInAvail, ready_in, dp_out, dm_out);
 
