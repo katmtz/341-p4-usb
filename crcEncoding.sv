@@ -29,11 +29,11 @@ module encoding(
 	logic [4:0] in5, out5;
 
 	always_comb begin
-		in5[0] = index2 != 0 ? 1'b1 : out5[4]^bstr;
-		in5[1] = index2 != 0 ? 1'b1 : out5[0];
-		in5[2] = index2 != 0 ? 1'b1 : out5[1]^in5[0];
-		in5[3] = index2 != 0 ? 1'b1 : out5[2];
-		in5[4] = index2 != 0 ? 1'b1 : out5[3]; //'
+		in5[0] = index2 == 6'b0 ? 1'b1 : out5[4]^bstr;
+		in5[1] = index2 == 6'b0 ? 1'b1 : out5[0];
+		in5[2] = index2 == 6'b0 ? 1'b1 : out5[1]^in5[0];
+		in5[3] = index2 == 6'b0 ? 1'b1 : out5[2];
+		in5[4] = index2 == 6'b0 ? 1'b1 : out5[3];
 	end
 
 	ff ff5_0(clk,rst_b,in5[0],out5[0]),
@@ -44,7 +44,7 @@ module encoding(
 
 	//SAVE CRC??
 	logic save;
-	assign save = (index2==6'd11); //'
+	assign save = (index2==6'd12); //'
 
 	//following controls sending to bit stuffing yay
 
@@ -59,7 +59,7 @@ module encoding(
 
 	always_comb begin
 		pktToken = pkt[98:64]; //THIS IS SO BAD IM SRY
-		if (index2==6'd11) begin //' SAVE FF OUTPUTS
+		if (index2==6'd12) begin //' SAVE FF OUTPUTS
 			crc5 = out5;
 			pktToken[7:3] = ~out5; //was backwards before: lsb to msb
 		end
@@ -233,7 +233,7 @@ module Counter2( //up to 11 max
 	output logic [5:0] index);
 
 	always_ff @(posedge clk, posedge clr)
-		if (clr || (index==11))
+		if (clr || (index==12))
 		  index <=0;
 		else if (en || (index!=0))
 		  index <= index + 1;
