@@ -10,12 +10,14 @@ module bitstuffing (clk, rst_b,
                     bstr_out, bstr_out_ready);
     input logic clk, rst_b;
     input bit bstr_in;
-    input logic bstr_in_ready;
+    input logic [1:0] bstr_in_ready;
     output bit bstr_out;
     output logic bstr_out_ready;
 
     bit stream;
-    assign stream = bstr_in && bstr_in_ready;
+    assign stream = bstr_in;
+    logic bstr_in_avail;
+    assign bstr_in_avail = (bstr_in_ready != 2'b0);
 
     // determine when to insert a 0 bit
     reg [2:0] count;
@@ -32,7 +34,7 @@ module bitstuffing (clk, rst_b,
     logic q_empty, q_out;
     fifo q (.clk(clk), .rst_b(rst_b), 
             .data_in(stream),
-            .we(bstr_in_ready), .re(re),
+            .we(bstr_in_avail), .re(re),
             .empty(q_empty), .data_out(q_out));
 
     assign bstr_out = (swp) ? 0 : q_out;

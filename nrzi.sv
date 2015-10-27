@@ -4,15 +4,16 @@
 `define DATA_S 7'd92
 
 module nrzi(clk, rst_b, 
-            bstr_in, bstr_in_ready, p_type,
+            bstr_in, bstr_in_ready,
             bstr_out, bstr_out_ready);
 
-    input bit clk, rst_b, bstr_in, bstr_in_ready;
-    input bit [1:0] p_type;
+    input bit clk, rst_b, bstr_in;
+    input bit [1:0] bstr_in_ready;
     output bit bstr_out, bstr_out_ready;
 
-    logic use_nrzi;
-    nrzi_ctrl ctrl (.*);
+    logic use_nrzi, bstr_avail;
+    assign bstr_avail = (bstr_in_ready != 2'b0);
+    nrzi_ctrl ctrl (clk, rst_b, bstr_avail, bstr_in_ready, use_nrzi);
 
     // calculate the nrzi value if you're supposed to
     reg nrzi_val;
