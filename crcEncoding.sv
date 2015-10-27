@@ -1,5 +1,3 @@
-`default_nettype none
-
 module encoding(
 	input bit clk, rst_b,
 	output logic [1:0] ready,
@@ -160,7 +158,7 @@ module PISO_reg( //for OUT/IN: 24+8+3=35
 		Empty:
 			nextState = save ? Sending : Empty;
 		Sending:
-			nextState = index>0 ? Last : Sending;
+			nextState = index>0 ? Sending : Last;
 		Last:
 			nextState = Empty;
 		default:
@@ -173,7 +171,7 @@ module PISO_reg( //for OUT/IN: 24+8+3=35
   		counterEn = 1;
   		end
   	else begin
-  		counterClr = 1;
+  		counterClr = (nextState==Wait) ? 1'b1 : ~rst_b;//'
   		counterEn = 0;
   		end
 
