@@ -14,16 +14,15 @@ module encoding(
 
 	logic [5:0] index;
 
-	logic clr,en;
-	assign clr = ~rst_b; 
+	logic en;
 	assign en = pktInAvail;
 
 	logic [10:0] addrENDP;
 	assign addrENDP = pkt[82:72];
 
-	Counter pktIndexCount(en,clr,clk,index);
+	Counter pktIndexCount(en,~rst_b,clk,index);
 	logic [5:0] index2;
-	Counter2 pktIndexPlus1(en,clr,clk,index2);
+	Counter2 pktIndexPlus1(en,~rst_b,clk,index2);
 
 	logic bstr;
 	assign bstr = addrENDP[index];
@@ -47,12 +46,34 @@ module encoding(
 
 	//SAVE CRC??
 	logic save;
-	assign save = (index==6'd11); //'
+	assign save = (index2==6'd11); //'
 
 	//following controls sending to bit stuffing yay
 
-	sendToStuffer sTS(pkt,index2,clk,save,rst_b);
+	logic [4:0] crc5;
+	logic put_outbound, full;
 
+	logic [34:0] pktToken;    //ALL OF THIS STILL FIX L8R
+	
+	PISO_reg piso(bOut,full,put_outbound,pktToken,clk,save,~rst_b);
+	
+	assign ready = put_outbound ? 2'b01 : 2'b00; //CHANGE L8R
+
+	always_comb begin
+		pktToken = pkt[98:64]; //THIS IS SO BAD IM SRY
+		if (index2==6'd11) begin //' SAVE FF OUTPUTS
+			crc5 = out5;
+			pktToken[7] = out5[0]; //was backwards before: lsb to msb
+			pktToken[6] = out5[1];
+			pktToken[5] = out5[2];
+			pktToken[4] = out5[3];
+			pktToken[3] = out5[4];
+		end
+		else begin
+			crc5 = 5'd0;
+			pktToken = 35'd0; 
+		end
+	end
 
 	//for crc16
 /*   not using this for prelab: (ignore for now)
@@ -191,11 +212,11 @@ endmodule: PISO_reg
 
 
 module revCounter( //actually counts normally wow
-	input logic en, clr, clk,
+	input logic en, rst, clk,
 	output logic [5:0] index);
 
-	always_ff @(posedge clk, posedge clr)
-		if (clr)
+	always_ff @(posedge clk, posedge rst)
+		if (rst)
 		  index <=6'd34;  //'this syntax highlighting is silly
 		else if (en)
 		  index <= (index!=0) ? index - 1 : 0; //dont wanna be goin negative
@@ -223,35 +244,3 @@ module Counter2( //up to 11 max
 		else if (en || (index!=0))
 		  index <= index + 1;
 endmodule: Counter2
-
-module sendToStuffer(
-	input logic [98:0] pkt,
-	input logic [5:0] index,
-	input bit clk,save,rst_b);
-
-	logic [4:0] crc5;
-	logic put_outbound, full;
-
-	logic [34:0] pktToken;    //ALL OF THIS STILL FIX L8R
-	
-	PISO_reg piso(bOut,full,put_outbound,pktToken,clk,save,~rst_b);
-	
-	assign ready = put_outbound ? 2'b01 : 2'b00; //CHANGE L8R
-
-	always_comb begin
-		pktToken = pkt[98:64]; //THIS IS SO BAD IM SRY
-		if (index2==6'd11) begin //' SAVE FF OUTPUTS
-			crc5 = out5;
-			pktToken[7] = out5[0]; //was backwards before: lsb to msb
-			pktToken[6] = out5[1];
-			pktToken[5] = out5[2];
-			pktToken[4] = out5[3];
-			pktToken[3] = out5[4];
-		end
-		else begin
-			crc5 = 5'd0;
-			pktToken = 35'd0; 
-		end
-	end
-
-endmodule: sendToStuffer
