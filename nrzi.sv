@@ -1,5 +1,5 @@
 // Constants for packet sizes - info bytes + sync
-`define TOK_S 7'd28
+`define TOK_S 7'd32
 `define HANDSHAKE_S 7'd12
 `define DATA_S 7'd92
 

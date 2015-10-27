@@ -66,6 +66,7 @@ module encoding(
             pktToken[5] = ~out5[2];
             pktToken[4] = ~out5[3];
             pktToken[3] = ~out5[4];
+            pktToken[0] = 1;
         end
 		else begin
 			crc5 = 5'd0;
