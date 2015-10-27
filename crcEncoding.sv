@@ -33,11 +33,11 @@ module encoding(
 	logic [4:0] in5, out5;
 
 	always_comb begin
-		in5[0] = out5[4]^bstr;
-		in5[1] = out5[0];
-		in5[2] = out5[1]^in5[0];
-		in5[3] = out5[2];
-		in5[4] = out5[3];
+		in5[0] = ~pktInAvail ? 1'b1 : out5[4]^bstr;
+		in5[1] = ~pktInAvail ? 1'b1 : out5[0];
+		in5[2] = ~pktInAvail ? 1'b1 : out5[1]^in5[0];
+		in5[3] = ~pktInAvail ? 1'b1 : out5[2];
+		in5[4] = ~pktInAvail ? 1'b1 : out5[3]; //'
 	end
 
 	ff ff5_0(clk,rst_b,in5[0],out5[0]),
@@ -47,34 +47,13 @@ module encoding(
 	   ff5_4(clk,rst_b,in5[4],out5[4]);
 
 	//SAVE CRC??
-	logic [4:0] crc5;
-	logic save, put_outbound, full;
+	logic save;
 	assign save = (index==6'd11); //'
 
 	//following controls sending to bit stuffing yay
 
+	sendToStuffer sTS(pkt,index2,clk,save,rst_b);
 
-	logic [34:0] pktToken;    //ALL OF THIS STILL FIX L8R
-	
-	PISO_reg piso(bOut,full,put_outbound,pktToken,clk,save,~rst_b);
-	
-	assign ready = put_outbound ? 2'b01 : 2'b00; //CHANGE L8R
-
-	always_comb begin
-		pktToken = pkt[98:64]; //THIS IS SO BAD IM SRY
-		if (index2==6'd11) begin //' SAVE FF OUTPUTS
-			crc5 = out5;
-			pktToken[7] = out5[0]; //was backwards before: lsb to msb
-			pktToken[6] = out5[1];
-			pktToken[5] = out5[2];
-			pktToken[4] = out5[3];
-			pktToken[3] = out5[4];
-		end
-		else begin
-			crc5 = 5'd0;
-			pktToken = 35'd0; 
-		end
-	end
 
 	//for crc16
 /*   not using this for prelab: (ignore for now)
@@ -121,14 +100,14 @@ module encoding(
 
 endmodule: encoding
 
-module ff(
+module ff(  //initiated to ONE
 	input bit clk, rst_b,
 	input bit in,
 	output bit out);
 
 	always_ff @(posedge clk, negedge rst_b)
 		if(~rst_b)
-			out <= 0;
+			out <= 1;
 		else
 			out <= in;
 
@@ -245,3 +224,35 @@ module Counter2( //up to 11 max
 		else if (en || (index!=0))
 		  index <= index + 1;
 endmodule: Counter2
+
+module sendToStuffer(
+	input logic [98:0] pkt,
+	input logic [5:0] index,
+	input bit clk,save,rst_b);
+
+	logic [4:0] crc5;
+	logic put_outbound, full;
+
+	logic [34:0] pktToken;    //ALL OF THIS STILL FIX L8R
+	
+	PISO_reg piso(bOut,full,put_outbound,pktToken,clk,save,~rst_b);
+	
+	assign ready = put_outbound ? 2'b01 : 2'b00; //CHANGE L8R
+
+	always_comb begin
+		pktToken = pkt[98:64]; //THIS IS SO BAD IM SRY
+		if (index2==6'd11) begin //' SAVE FF OUTPUTS
+			crc5 = out5;
+			pktToken[7] = out5[0]; //was backwards before: lsb to msb
+			pktToken[6] = out5[1];
+			pktToken[5] = out5[2];
+			pktToken[4] = out5[3];
+			pktToken[3] = out5[4];
+		end
+		else begin
+			crc5 = 5'd0;
+			pktToken = 35'd0; 
+		end
+	end
+
+endmodule: sendToStuffer

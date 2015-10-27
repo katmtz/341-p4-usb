@@ -5,9 +5,18 @@ module usbHost
 
   /* Tasks needed to be finished to run testbenches */
 
-  task prelabRequest();
+  task prelabRequest(
+    output logic [98:0] pkt,
+    output bit pktInAvail);
   // sends an OUT packet with ADDR=5 and ENDP=4
   // packet should have SYNC and EOP too
+
+      pkt[98:64] = 35'h0187a040;
+      pkt[63:0] = 64'd0;
+      pktInAvail = 1'b1;//'
+
+      #1000;
+      return;
 
   endtask: prelabRequest
 
