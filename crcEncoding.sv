@@ -62,6 +62,7 @@ module encoding(
 		if (index2==6'd11) begin //' SAVE FF OUTPUTS
 			crc5 = out5;
 			pktToken[7:3] = ~out5; //was backwards before: lsb to msb
+            pktToken[0] = 1;
 			
 		end
 		else begin

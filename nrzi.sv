@@ -26,7 +26,7 @@ module nrzi(clk, rst_b,
     end
 
     assign bstr_out = (use_nrzi) ? nrzi_val : bstr_in,
-           bstr_out_ready = bstr_out_ready_r;
+           bstr_out_ready = bstr_in_ready;
 
 endmodule
 
