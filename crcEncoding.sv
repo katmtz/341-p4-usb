@@ -61,8 +61,12 @@ module encoding(
 		pktToken = pkt[98:64]; //THIS IS SO BAD IM SRY
 		if (index2==6'd12) begin //' SAVE FF OUTPUTS
 			crc5 = out5;
-			pktToken[7:3] = ~out5; //was backwards before: lsb to msb
-		end
+			pktToken[7] = ~out5[0]; //was backwards before: lsb to msb
+		    pktToken[6] = ~out5[1];
+            pktToken[5] = ~out5[2];
+            pktToken[4] = ~out5[3];
+            pktToken[3] = ~out5[4];
+        end
 		else begin
 			crc5 = 5'd0;
 			pktToken = 35'd0; 
