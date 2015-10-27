@@ -171,7 +171,7 @@ module PISO_reg( //for OUT/IN: 24+8+3=35
   		counterEn = 1;
   		end
   	else begin
-  		counterClr = (nextState==Wait) ? 1'b1 : ~rst_b;//'
+  		counterClr = (nextState==Empty) ? 1'b1 : rst;//'
   		counterEn = 0;
   		end
 
