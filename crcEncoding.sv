@@ -144,7 +144,7 @@ module PISO_reg( //for OUT/IN: 24+8+3=35
   
   enum logic [5:0] {Empty,Sending,Last} currState, nextState;
 
-  logic [31:0] savedIn;
+  logic [34:0] savedIn;
   always_ff @(posedge clk, posedge rst)
 	  if (rst)
 		savedIn <= 0;
