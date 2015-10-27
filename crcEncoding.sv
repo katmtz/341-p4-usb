@@ -29,11 +29,11 @@ module encoding(
 	logic [4:0] in5, out5;
 
 	always_comb begin
-		in5[0] = ~pktInAvail ? 1'b1 : out5[4]^bstr;
-		in5[1] = ~pktInAvail ? 1'b1 : out5[0];
-		in5[2] = ~pktInAvail ? 1'b1 : out5[1]^in5[0];
-		in5[3] = ~pktInAvail ? 1'b1 : out5[2];
-		in5[4] = ~pktInAvail ? 1'b1 : out5[3]; //'
+		in5[0] = index2 != 0 ? 1'b1 : out5[4]^bstr;
+		in5[1] = index2 != 0 ? 1'b1 : out5[0];
+		in5[2] = index2 != 0 ? 1'b1 : out5[1]^in5[0];
+		in5[3] = index2 != 0 ? 1'b1 : out5[2];
+		in5[4] = index2 != 0 ? 1'b1 : out5[3]; //'
 	end
 
 	ff ff5_0(clk,rst_b,in5[0],out5[0]),
@@ -62,8 +62,6 @@ module encoding(
 		if (index2==6'd11) begin //' SAVE FF OUTPUTS
 			crc5 = out5;
 			pktToken[7:3] = ~out5; //was backwards before: lsb to msb
-            pktToken[0] = 1;
-			
 		end
 		else begin
 			crc5 = 5'd0;
