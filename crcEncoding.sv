@@ -1,3 +1,5 @@
+`default_nettype none
+
 module encoding(
 	input bit clk, rst_b,
 	output logic [1:0] ready,
@@ -158,7 +160,7 @@ module PISO_reg( //for OUT/IN: 24+8+3=35
 		Empty:
 			nextState = save ? Sending : Empty;
 		Sending:
-			nextState = Last;
+			nextState = index>0 ? Last : Sending;
 		Last:
 			nextState = Empty;
 		default:
