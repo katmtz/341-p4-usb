@@ -3,6 +3,55 @@
 `define HANDSHAKE_S 7'd12
 `define DATA_S 7'd92
 
+/*
+ * DP/DM
+ * @input w_bstr - bitstream from host, to be written out
+ * @input w_bstr_ready - data ready for w_bstr, also indicates packet type
+ * @input rw - control signal from protocol fsm, controls whether dp/dm is
+ *             reading or writing; 0 is read, 1 is write
+ * @output r_bstr - bitstream into host, to be decoded
+ * @output r_bstr_ready - data ready for r_bstr, also indicates packet type 
+ */
+module dpdm (clk, rst_b,
+             w_bstr, w_bstr_ready,
+             r_bstr, r_bstr_ready,
+             rw, dp_r, dm_r, dp_w, dm_w);
+
+    input logic clk, rst_b, rw;
+    input logic [1:0] w_bstr_ready;           // ENCODING ==> DPDM
+    input bit w_bstr;                         // ENCODING ==> DPDM
+    input bit dp_r, dm_r;                     // DEVICE   ==> HOST
+    output bit dp_w, dm_w;                    // HOST     ==> DEVICE
+    output logic [1:0] r_bstr_ready;          // DPDM     ==> UNENCODING
+    output bit r_bstr;                        // DPDM     ==> UNENCODING
+
+    // writing
+    w_dpdm w (clk, rst_b, w_bstr, w_bstr_ready, dp_w, dm_w);
+
+    // reading - scaffolded bc I just DO NOT have time to write this rn
+    r_dpdm r (clk, rst_b, r_bstr, r_bstr_ready, dp_r, dm_r);
+
+endmodule: dpdm
+
+/*
+ * DP/DM Reading
+ * - receives a bitstream from the device, passes the right info 
+ * on to the unencoding pipeline
+ * TODO: actually implement this.
+ */
+module r_dpdm(clk, rst_b,
+              bstr, bstr_ready,
+              dp, dm);
+
+    input logic clk, rst_b;
+    input bit dp, dm;
+    output bit bstr;
+    output logic [1:0] bstr_ready;
+
+    assign bstr = dp;
+    assign bstr_ready = (!(dp == 1'b0 && dm == 1'b0));
+
+endmodule: r_dpdm
 
 /*
  * DP/DM Writing:
@@ -10,26 +59,29 @@
  * conform to the dp/dm spec
  */
 module w_dpdm (clk, rst_b,
-             bstr_in, bstr_in_ready, p_type,
+             bstr, bstr_ready,
              dp, dm);
 
     input logic clk, rst_b;
-    input bit bstr_in, bstr_in_ready;
-    input logic [1:0] p_type;
+    input bit bstr;
+    input logic [1:0] bstr_ready;
     output logic dp, dm;
 
-    logic use_stream, use_EOP, use_J;
-    w_dpdm_crtl ctrl (.*)
+    logic bstr_avail, use_stream, use_SEO, use_J;
+    assign bstr_avail = (bstr_ready != 2'b0);
+    w_dpdm_ctrl ctrl (clk, rst_b, 
+                      bstr_avail, bstr_ready, 
+                      use_stream, use_SEO, use_J);
 
     always_comb begin
-        if (~bstr_ready) begin
+        if (~bstr_avail) begin
             dp = 1'b1;
             dm = 1'b0;
         end
         else begin
             if (use_stream) begin
-                dp = bstr_in;
-                dm = ~bstr_in;
+                dp = bstr;
+                dm = ~bstr;
             end
             if (use_SEO) begin
                 dp = 1'b0;
@@ -42,16 +94,16 @@ module w_dpdm (clk, rst_b,
         end
     end
 
-endmodule
+endmodule: w_dpdm
 
-module w_dpdm_ctrl(clk, rst_b,
-                 bstr_in_ready, p_type,
-                 use_stream, use_EOP, use_J);
+module w_dpdm_ctrl (clk, rst_b,
+                    bstr_ready, p_type,
+                    use_stream, use_SEO, use_J);
 
     input logic clk, rst_b;
-    input bit bstr_in_ready;
+    input bit bstr_ready;
     input logic [1:0] p_type;
-    output logic use_stream, use_EOP, use_J;
+    output logic use_stream, use_SEO, use_J;
 
     // decide what counter's limit should be;
     logic [6:0] counter_lim;
@@ -67,7 +119,7 @@ module w_dpdm_ctrl(clk, rst_b,
     reg [6:0] counter;
     bit [6:0] count_in;
     always_comb begin
-        if (~bstr_in_ready)
+        if (~bstr_ready)
             count_in = 7'b0;
         else begin
             count_in = counter + 1;
@@ -81,17 +133,16 @@ module w_dpdm_ctrl(clk, rst_b,
 
     // use stream if we are in the packet data
     always_comb begin
-        if (bstr_in_ready) begin
+        if (bstr_ready) begin
             use_stream = (counter <= counter_lim) ? 1'b1 : 1'b0;
-            use_EOP = (counter > counter_lim && counter <= (counter_lim + 2)) ? 1'b1 : 1'b0;
+            use_SEO = (counter > counter_lim && counter <= (counter_lim + 2)) ? 1'b1 : 1'b0;
             use_J = (counter > (counter_lim + 2)) ? 1'b1 : 1'b0;
         end
         else begin
             use_stream = 1'b0;
-            use_EOP = 1'b0;
+            use_SEO = 1'b0;
             use_J = 1'b0;
         end
     end
 
-endmodule
-
+endmodule: w_dpdm_ctrl
