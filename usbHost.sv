@@ -1,3 +1,5 @@
+`include "prelab.sv"
+
 // Write your usb host here.  Do not modify the port list.
 module usbHost
   (input logic clk, rst_L,
@@ -5,11 +7,11 @@ module usbHost
 
   /* Tasks needed to be finished to run testbenches */
 
-  task prelabRequest(
-      output logic [98:0] pkt,
-      output bit pktInAvail);
+  task prelabRequest();
       // sends an OUT packet with ADDR=5 and ENDP=4
       // packet should have SYNC and EOP too
+      logic [98:0] pkt;
+      logic pktInAvail;
 
       $display("Sending an OUT packet....");
       pkt[98:64] = 35'h0187a040;
@@ -40,5 +42,15 @@ module usbHost
 
   // usbHost starts here!!
 
+  logic we, dp_out, dm_out;
+  assign we = 1'b1; // this signal should come from the fsm but we r not doin that just yet
+  assign wires.DP = (we) ? dp_out : 1'bz;
+  assign wires.DM = (we) ? dm_out : 1'bz;
+
+  logic ready_in;
+  logic [98:0] pkt;
+  logic pktInAvail;
+
+  prelab dut (clk, rst_L, pkt, pktInAvail, ready_in, dp_out, dm_out);
 
 endmodule: usbHost

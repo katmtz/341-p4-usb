@@ -9,7 +9,8 @@ module nrzi(clk, rst_b,
 
     input bit clk, rst_b, bstr_in;
     input bit [1:0] bstr_in_ready;
-    output bit bstr_out, bstr_out_ready;
+    output bit bstr_out;
+    output bit [1:0] bstr_out_ready;
 
     logic use_nrzi, bstr_avail;
     assign bstr_avail = (bstr_in_ready != 2'b0);

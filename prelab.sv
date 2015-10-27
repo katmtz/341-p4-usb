@@ -11,11 +11,11 @@ module prelab(clk, rst_b,
     output logic ready_in;
     output bit dp, dm;
 
-    logic crc2stuffer_str, stuffer2nrzi_str, nrzi2dpdm_str, dp_r, dm_r, rw;
-    logic [1:0] crc2stuffer_ready, stuffer2nrzi_ready, nrzi2dpdm_ready;
+    logic crc2stuffer_str, stuffer2nrzi_str, nrzi2dpdm_str, dp_r, dm_r, rw, read_str;
+    logic [1:0] crc2stuffer_ready, stuffer2nrzi_ready, nrzi2dpdm_ready, read_ready;
 
     encoding    encoder (clk, rst_b, crc2stuffer_ready, pkt, pkt_avail, crc2stuffer_str, ready_in);
     bitstuffing stuffer (clk, rst_b, crc2stuffer_str, crc2stuffer_ready, stuffer2nrzi_str, stuffer2nrzi_ready);
     nrzi        nrzier  (clk, rst_b, stuffer2nrzi_str, stuffer2nrzi_ready, nrzi2dpdm_str, nrzi2dpdm_ready);
-    dpdm        dpdmer  (clk, rst_b, nrzi2dpdm_str, nrzi2dpdm_ready, rw, dp_r, dm_r, dp, dm);
+    dpdm        dpdmer  (clk, rst_b, nrzi2dpdm_str, nrzi2dpdm_ready, read_str, read_ready, rw, dp_r, dm_r, dp, dm);
 endmodule: prelab

@@ -1,5 +1,3 @@
-`default_nettype none
-
 module encoding(
 	input bit clk, rst_b,
 	output logic [1:0] ready,

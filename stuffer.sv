@@ -12,7 +12,7 @@ module bitstuffing (clk, rst_b,
     input bit bstr_in;
     input logic [1:0] bstr_in_ready;
     output bit bstr_out;
-    output logic bstr_out_ready;
+    output logic [1:0] bstr_out_ready;
 
     bit stream;
     assign stream = bstr_in;
@@ -38,7 +38,7 @@ module bitstuffing (clk, rst_b,
             .empty(q_empty), .data_out(q_out));
 
     assign bstr_out = (swp) ? 0 : q_out;
-    assign bstr_out_ready = ~q_empty;
+    assign bstr_out_ready = (~q_empty) ? 2'b01 : 2'b0; // this should be type
 
 endmodule
 
