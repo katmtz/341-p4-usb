@@ -19,7 +19,7 @@ module usbHost
       pktInAvail = 1'b1;
       #20 pktInAvail = 1'b0;
 
-      #100;
+      #1000;
       $display("Returning from task prelabRequest");
   endtask: prelabRequest
 
