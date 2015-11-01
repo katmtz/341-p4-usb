@@ -43,15 +43,27 @@ module datapath (clk, rst_b,
     // INBOUND PKTS:
     // DPDM --> PROTOCOL FSM
 
-    logic dpdm2nrzi_str, dpdm2nrzi_ready, nrzi2unstuffer_str, nrzi2unstuffer_ready,
-          unstuffer2crc_str, unstuffer2crc_ready;
+    logic dpdm2nrzi_str, dpdm2nrzi_ready, dpdm2nrzi_done, nrzi2unstuffer_str, nrzi2unstuffer_ready, nrzi2unstuffer_done,
+          unstuffer2crc_str, unstuffer2crc_ready, unstuffer2crc_done;
 
-    decoding   decoder   (clk, rst_b, pkt_out, unstuffer2crc_ready, unstuffer2crc_str, pkt_out_avail, data_good, decoder_ready);
-    unstuffing unstuffer (clk, rst_b, nrzi2unstuffer_str, nrzi2unstuffer_ready, unstuffer2crc_str, unstuffer2crc_ready);
-    unnrzi     unnrzier  (clk, rst_b, dpdm2nrzi_str, dpdm2nrzi_str, nrzi2unstuffer_str, nrzi2unstuffer_ready);
+    decoding   decoder   (clk, rst_b, 
+                          pkt_out, unstuffer2crc_ready, unstuffer2crc_str, pkt_out_avail, 
+                          data_good, decoder_ready, unstuffer2crc_done);
+
+    unstuffing unstuffer (clk, rst_b, 
+                          nrzi2unstuffer_str, nrzi2unstuffer_ready, nrzi2unstuffer_done,
+                          unstuffer2crc_str, unstuffer2crc_ready, unstuffer2crc_done);
+
+    unnrzi     unnrzier  (clk, rst_b, 
+                          dpdm2nrzi_str, dpdm2nrzi_str, dpdm2nrzi_done, 
+                          nrzi2unstuffer_str, nrzi2unstuffer_ready, nrzi2unstuffer_done);
 
     // I/O
-    // DPDM <--> DEVICE
-    dpdm        dpdmer  (clk, rst_b, nrzi2dpdm_str, nrzi2dpdm_ready, dpdm2nrzi_str, dpdm2nrzi_ready, dp_r, dm_r, dp, dm, re);
+    // DATAPATH <--> [ DPDM ] <--> DEVICE
+    dpdm        dpdmer  (clk, rst_b, 
+                         nrzi2dpdm_str, nrzi2dpdm_ready, 
+                         dpdm2nrzi_str, dpdm2nrzi_ready, 
+                         dp_r, dm_r, dp_w, dm_w, 
+                         re, dpdm2nrzi_done);
 
 endmodule: datapath
