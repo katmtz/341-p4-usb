@@ -15,9 +15,10 @@
 module dpdm (clk, rst_b,
              w_bstr, w_bstr_ready,
              r_bstr, r_bstr_ready,
-             rw, dp_r, dm_r, dp_w, dm_w);
+             dp_r, dm_r, dp_w, dm_w, 
+             re, done);
 
-    input logic clk, rst_b, rw;
+    input logic clk, rst_b;
     input logic [1:0] w_bstr_ready;           // ENCODING ==> DPDM
     input bit w_bstr;                         // ENCODING ==> DPDM
     input bit dp_r, dm_r;                     // DEVICE   ==> HOST
@@ -25,11 +26,17 @@ module dpdm (clk, rst_b,
     output logic [1:0] r_bstr_ready;          // DPDM     ==> UNENCODING
     output bit r_bstr;                        // DPDM     ==> UNENCODING
 
+    input bit re;                             // PROTOCOL FSM ==> DPDM
+    output bit done;                          // DPDM         ==> UNENCODING
+    logic r_ready;
+
     // writing
     w_dpdm w (clk, rst_b, w_bstr, w_bstr_ready, dp_w, dm_w);
 
-    // reading - scaffolded bc I just DO NOT have time to write this rn
-    r_dpdm r (clk, rst_b, r_bstr, r_bstr_ready, dp_r, dm_r);
+    // reading
+    r_dpdm r (clk, rst_b, r_bstr, r_ready, dp_r, dm_r, done);
+
+    assign r_bstr_ready = re && r_ready;      // only use bitstream if reading
 
 endmodule: dpdm
 
@@ -37,19 +44,34 @@ endmodule: dpdm
  * DP/DM Reading
  * - receives a bitstream from the device, passes the right info 
  * on to the unencoding pipeline
- * TODO: actually implement this.
  */
 module r_dpdm(clk, rst_b,
               bstr, bstr_ready,
-              dp, dm);
+              dp, dm, done);
 
     input logic clk, rst_b;
     input bit dp, dm;
     output bit bstr;
-    output logic [1:0] bstr_ready;
+    output logic bstr_ready;
+
+    // seek sync -> send dp & assert bstr -> detect EOP -> deassert pkt avail
+    enum logic [1:0] {seek = 2'b00, en = 2'b01, eop = 2'b10} state, nextState;
+
+    always_comb
+        case (state)
+            seek: nextState = (dp == 1'b0 && dm == 1'b1) ? en : seek;
+            en: nextState = (dp == 1'b0 && dm == 1'b0) ? eop : en;
+            eop: nextState = (dp == 1'b1 && dm == 1'b0) ? seek : eop;
+        endcase  
+
+    always_ff @(posedge clk, negedge rst_b) begin
+        if (~rst_b) state <= seek;
+        else state <= nextState;
+    end
 
     assign bstr = dp;
-    assign bstr_ready = (!(dp == 1'b0 && dm == 1'b0));
+    assign bstr_ready = (state == en || state == eop);
+    assign done = (state == eop && nextState == seek);
 
 endmodule: r_dpdm
 
