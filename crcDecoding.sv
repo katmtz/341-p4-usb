@@ -1,121 +1,99 @@
-module encoding(
+module decoding(
 	input bit clk, rst_b,
-	output logic [1:0] ready,
-	input logic [98:0] pkt,  //99 is max size
-	input bit pktInAvail,
-	output bit bOut,
+	output logic [98:0] pkt,  //99 is max size
+    input bit bitInAvail,
+    input bit bitIn,
+    input bit done,
+	output bit pktOutAvail,
+    output bit valid,
 	output bit readyIn);
 
-	enum logic [2:0] {Wait,CRC5Calc,TokenSend,CRC16Calc,
-                      DataSend,HandShakeSend} currState,nextState;
-    enum logic [1:0] {None=2'b00, Token = 2'b01, Data = 2'b10, 
-                      HandShake=2'b11} pktType;
+    assign readyIn = 1; //always ready
 
-    assign readyIn = (currState==Wait);
+    enum logic [2:0] {Wait,Collect,CRC5,CRC16} currState,nextState;
 
-    logic [3:0] PID; //remember: reversed, so 1000 for out
-    assign PID = pkt[90:87];
+    bit isToken,isData;
+    logic [3:0] PID, nPID;
 
-    logic [10:0] addrENDP;
-    logic [63:0] dataBits;
-    assign addrENDP = pkt[82:72]; //will only matter if token
-    assign dataBits = pkt[82:19]; //will only matter if data
-
-    always_comb //assign packet types
-        case (PID)
-            4'b1000:
-                pktType = Token;
-            4'b1001:
-                pktType = Token;
-            4'b1100:
-                pktType = Data;
-            4'b0100:
-                pktType = HandShake;
-            4'b0101:
-                pktType = HandShake;
-            default:
-                pktType = None;
-        endcase
-    logic put_outbound;
-    assign ready = put_outbound ? pktType : 2'b00; //'
+    always_ff @(posedge clk,negedge rst_b)
+        if (~rst_b||(currState==Wait)) begin
+            isToken <= 0;
+            isData <= 0;
+            end
+        else if (PID[3:1]==3'b100)
+            isToken <= 1;
+        else if (PID[3:0]==4'b1100)
+            isData <= 1;
 
 
     logic [6:0] count, max, index; //controls nextState and index of pkt
     assign index = (count>=max) ? 0 : count; 
     logic counterEn,counterClr; //assigned based on state
-    assign counterEn = (nextState != Wait);
+    assign counterEn = bitInAvail || ((nextState != Wait)&&(nextState != Collect));
     assign counterClr = (nextState == Wait);
-    maxCounter mC(counterEn,counterClr,clk,max,count);
+    maxCounter2 mC(counterEn,counterClr,clk,max,count);
+
+    //collect packet
+    logic sipoDone,sipoRst;
+    logic [6:0] sipoMax;
+    assign sipoMax = (isToken) ? 7'd35 : (isData ? 7'd99 : 7'd19); //'
+    assign sipoRst = ~rst_b||(nextState==Wait);
+    SIPO_reg sipo(pkt,bitIn,sipoDone,sipoMax,clk,bitInAvail,sipoRst);
+
+    //get residues!
+    logic [4:0] compRemainder5,residue5,checkR5;
+    logic [15:0] compRemainder16,residue16,checkR16;
+    assign checkR5 = 5'b0110;
+    assign checkR16 =  16'h800d;   
+    assign compRemainder5 = ~pkt[7:3];
+    assign compRemainder16 = ~pkt[18:3];
 
     logic c5rst, c16rst; //assigned based on state
-    assign c5rst = (nextState != CRC5Calc);
-    assign c16rst = (nextState != CRC16Calc);
+    assign c5rst = (nextState != CRC5);
+    assign c16rst = (nextState != CRC16);
     logic [4:0] out5;
     logic [15:0] out16;
-    calc5 ffer5(clk,c5rst,addrENDP,count,out5);  //all the flipflop logic
-    calc16 ffer16(clk,c16rst,dataBits,count,out16);  //for 5 and 16
+    calcR5 ffer5(clk,c5rst,compRemainder5,count,residue5);  //all the flipflop logic
+    calcR16 ffer16(clk,c16rst,compRemainder16,count,residue16);  //for 5 and 16
 
-    always_comb
-        case (currState)
-            Wait: begin
-                nextState = ~pktInAvail ? Wait : (
-                            pktType==Token ? CRC5Calc : (
-                            pktType==Data ? CRC16Calc : 
-                            pktType==HandShake ? HandShakeSend : (
-                            Wait)));
-                max = 7'd12;
-                end
-            CRC5Calc: begin
-                nextState = (count==12) ? TokenSend : CRC5Calc;
-                max = 7'd12;
-                end
-            CRC16Calc: begin
-                nextState = (count==65) ? DataSend : CRC16Calc;
-                max = 7'd65;
-                end
-            TokenSend: begin
-                nextState = (count==35) ? Wait : TokenSend;
-                max = 7'd35;
-                end
-            DataSend: begin
-                nextState = (count==99) ? Wait : DataSend;
-                max = 7'd99;
-                end
-            HandShakeSend: begin
-                nextState = (count==19) ? Wait : HandShakeSend;
-                max = 7'd19;
-                end
-            default: begin
-                nextState = Wait;
-                max = 7'd0;
-                end //'
-        endcase
+    always_comb begin  //get valid
+        pktOutAvail = (nextState==Wait)&&((currState==CRC5)||(currState==CRC16));
+        valid = pktOutAvail && (PID==~nPID) && ((
+                residue16==checkR16)||(residue5==checkR5));
+    end
 
-    logic [98:0] pktToken;
-    logic [98:0] pktData, pktToSend;
-    logic [98:0] pktHandshake;
-    logic full, save;
-    logic [6:0] rstIndex;
-    assign pktToSend = (nextState==HandShakeSend) ? pktHandshake : (
-                        nextState==DataSend ? pktData : pktToken);
-    assign rstIndex = (nextState==HandShakeSend) ? 7'd18 : (
-                        nextState==DataSend ? 7'd98 : 7'd34); //'
-    PISO_reg piso(bOut,full,put_outbound,pktToSend,rstIndex,clk,save,~rst_b);
-        
-
-    always_comb begin //assigning the calculated crc into the packet to send
-        pktToken = 98'd0;
-        pktHandshake = 98'd0;
-        pktToken = pkt[98:64];
-        pktData = pkt;
-        pktHandshake = pkt[98:79];
-        save=0;
-        if (((currState==CRC5Calc) || (currState==CRC16Calc)) && (count==11)) begin
-            save = 1;
-            pktToken[7:3] = ~out5[4:0];
-            pktData[18:3] = ~out16[15:0];
-            //$display("%b,%h, %b, %b, %s",out5,pktToSend,pktToken[7:3],max,nextState);
+    always_ff @(posedge clk,negedge rst_b) //find PID
+        if (~rst_b||(currState==Wait)) begin
+            PID <= 4'd0;
+            nPID <= 4'd15;
             end
+        else if ((currState==Collect)&&(count==16)) begin //MIGHT GET AN OFF-BY-ONE ERROR: debuggy
+            PID <= pkt[7:4]; 
+            nPID <= pkt[3:0];
+            end
+
+    always_comb begin //nextstate logic and max of counter
+        max = 7'd0; //default value: doesn't matter, not counting
+        case (currState)
+            Wait:
+                nextState = bitInAvail ? Collect : Wait;
+            Collect: begin
+                max = 7'd99;
+                nextState = ~done ? Collect : (  //CHANGED TO not done instead of bitInAvail
+                            isToken ? CRC5 : (isData ?
+                            CRC16 : Wait));
+            end
+            CRC5: begin
+                max = 7'd6;
+                nextState = (count==6) ? Wait : CRC5;
+            end
+            CRC16: begin
+                max = 7'd17; //'
+                nextState = (count==17) ? Wait : CRC16;
+            end
+            default:
+                nextState = Wait;
+        endcase
     end
 
 
@@ -125,17 +103,17 @@ module encoding(
         else
             currState <= nextState;
 
-endmodule: encoding
+endmodule: decoding
 
-module calc16(
+module calcR16(
     input bit clk, rst,
-    input logic [63:0] data,
-    input logic [6:0] index, //goes up to 65
+    input logic [15:0] compR,
+    input logic [6:0] index, //goes up to 17
     output logic [15:0] out16);
 
     logic [15:0] in16;
     logic bstr;
-    assign bstr = index<64 ? data[index] : 0;
+    assign bstr = index<16 ? compR[15-index] : 0;
 
     always_comb begin
         in16[0] = out16[15]^bstr;
@@ -172,22 +150,17 @@ module calc16(
        ff16_d(clk,rst,in16[13],out16[13]),
        ff16_e(clk,rst,in16[14],out16[14]),
        ff16_f(clk,rst,in16[15],out16[15]);
-endmodule: calc16
+endmodule: calcR16
 
-module calc5(
+module calcR5(
     input bit clk, rst,
-    input logic [10:0] addrENDP,
-    input logic [6:0] index, //goes up to 12
+    input logic [4:0] compR,
+    input logic [6:0] index, //goes up to 6
     output logic [4:0] out5);
 
     logic [4:0] in5;
     logic bstr;
-    logic [10:0] switchedAddrENDP;
-    always_comb begin
-        switchedAddrENDP[6:0] = addrENDP[10:4];
-        switchedAddrENDP[10:7] = addrENDP[3:0];
-    end
-    assign bstr = index<11 ? switchedAddrENDP[index] : 0;
+    assign bstr = index<5 ? compR[4-index] : 0;
 
     always_comb begin
         in5[0] = out5[4]^bstr;
@@ -204,8 +177,38 @@ module calc5(
        ff5_4(clk,rst,in5[4],out5[4]);
 
 
-endmodule: calc5
+endmodule: calcR5
 
+
+module SIPO_reg  //max count 
+	(output logic [98:0] d,
+	input bit inBit,
+	output logic done,
+    input logic [6:0] max,
+	input logic clock,
+	input logic en,
+	input logic rst);
+
+	logic [98:0] q;
+	logic [6:0] count;
+
+	assign d = q;
+	assign done = (count==max); 
+	
+	always_ff @(posedge clock, posedge rst)
+	  if (rst) begin
+	    q <= 0;
+	    count <= 0;
+	    end
+	  else if (en) begin
+	    q <= (q << 1) | inBit;
+	    count <= (count==99) ? 0 : (count+1);
+	    end
+//	  else begin
+//	    q <= q;
+//	    count <= 0;
+//	  end
+endmodule: SIPO_reg
 
 module ff(  //initiated to ONE
 	input bit clk, rst,
@@ -277,7 +280,6 @@ module PISO_reg( //for OUT/IN: 24+8+3=35, data: 99, hs: 19
 			full = save;
 			put_outbound = 1;
 			outBit = savedIn[index];
-            //$display("%b",outBit);
 		end
 		Last: begin
 			full = 1;
@@ -313,15 +315,15 @@ module revCounter( //actually counts normally wow
 endmodule: revCounter
 
 
-module maxCounter( //up to max
+module maxCounter2( //up to max, different than maxCounter in encoder
 	input logic en, clr, clk,
     input logic [6:0] max,
 	output logic [6:0] count);
 
 	always_ff @(posedge clk, posedge clr)
         if (clr || (count==max))
-		  count <=0;
-		else if (en || (count!=0)) 
+            count <=0;
+		else if (en) 
 		    count <= count + 1;
         
-endmodule: maxCounter
+endmodule: maxCounter2
