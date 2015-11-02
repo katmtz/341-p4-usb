@@ -1,4 +1,4 @@
-`include "prelab.sv"
+`include "datapath.sv"
 
 // Write your usb host here.  Do not modify the port list.
 module usbHost
@@ -43,13 +43,27 @@ module usbHost
 
   // usbHost starts here!!
 
-  logic we, dp_out, dm_out;
-  assign we = 1'b1; // this signal should come from the fsm but we r not doin that just yet
-  assign wires.DP = (we) ? dp_out : 1'bz;
-  assign wires.DM = (we) ? dm_out : 1'bz;
+  // wires to be hooked up to to protocol fsm
+  logic [98:0] pkt_from_fsm, pkt_into_fsm;
+  logic pkt_from_fsm_avail, pkt_into_fsm_avail, data_good, decoder_ready, encoder_ready, re;
+  // end 
 
-  logic ready_in;
+  // tri-state assignment
+  logic dp_w, dm_w, dp_r, dm_r;
 
-  prelab dut (clk, rst_L, pkt, pktInAvail, ready_in, dp_out, dm_out);
+  assign wires.DP = (~re) ? dp_w : 1'bz;
+  assign wires.DM = (~re) ? dm_w : 1'bz;
+  assign dp_r = wires.DP;
+  assign dm_r = wires.DM;
+
+  datapath d (clk, rst_b,
+              pkt_from_fsm, pkt_from_fsm_avail,
+              pkt_into_fsm, pkt_into_fsm_avail,
+              dp_w, dm_w, dp_r, dm_r,
+              data_good, decoder_ready, encoder_ready, re);
+
+  // <protocol fsm goes here>
+
+  // <read/write fsm goes here>
 
 endmodule: usbHost
