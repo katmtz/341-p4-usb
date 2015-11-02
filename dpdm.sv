@@ -23,7 +23,7 @@ module dpdm (clk, rst_b,
     input bit w_bstr;                         // ENCODING ==> DPDM
     input bit dp_r, dm_r;                     // DEVICE   ==> HOST
     output bit dp_w, dm_w;                    // HOST     ==> DEVICE
-    output logic [1:0] r_bstr_ready;          // DPDM     ==> UNENCODING
+    output logic r_bstr_ready;                // DPDM     ==> UNENCODING
     output bit r_bstr;                        // DPDM     ==> UNENCODING
 
     input bit re;                             // PROTOCOL FSM ==> DPDM

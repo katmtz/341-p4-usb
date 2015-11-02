@@ -47,8 +47,8 @@ module datapath (clk, rst_b,
           unstuffer2crc_str, unstuffer2crc_ready, unstuffer2crc_done;
 
     decoding   decoder   (clk, rst_b, 
-                          pkt_out, unstuffer2crc_ready, unstuffer2crc_str, pkt_out_avail, 
-                          data_good, decoder_ready, unstuffer2crc_done);
+                          pkt_out, unstuffer2crc_ready, unstuffer2crc_str, unstuffer2crc_done, 
+                          pkt_out_avail, data_good, decoder_ready);
 
     unstuffing unstuffer (clk, rst_b, 
                           nrzi2unstuffer_str, nrzi2unstuffer_ready, nrzi2unstuffer_done,

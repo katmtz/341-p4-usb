@@ -107,8 +107,9 @@ module usbHost
               data_good, decoder_ready, encoder_ready, re);
 
   // Protocol/RW wires
-  logic [15:0] token_pkt_in;
-  logic [63:0] data_pkt_in, ptcl_data;
+  logic [18:0] token_pkt_in;
+  logic [71:0] data_pkt_in;
+  logic [63:0] ptcl_data;
   logic ptcl_done, ptcl_success, ptcl_read;
 
   protocol p (token_pkt_in, data_pkt_in, data_avail,
