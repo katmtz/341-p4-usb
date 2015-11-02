@@ -7,8 +7,8 @@
 `include "reverser.sv"
 
 // Packet Data Constants
-`define OUTPID 8'b11100001
-`define INPID 8'b01101001
+`define OUTPID 8'b10000111
+`define INPID 8'b10010110
 `define DATAPID 8'b11000011
 `define ADDR 7'b1010000
 `define ENDP4 4'b0010
@@ -33,10 +33,10 @@ module rw_fsm (clk, rst_b,
     input logic [63:0] data_in;
     input logic [63:0] ptcl_data;
     input logic ptcl_ready, ptcl_done, ptcl_success;
-    output [18:0] token_pkt_out;
-    output [71:0] data_pkt_out;
-    output [63:0] data_to_tb; 
-    output data_avail, task_done, task_success;
+    output logic [18:0] token_pkt_out;
+    output logic [71:0] data_pkt_out;
+    output logic [63:0] data_to_tb; 
+    output logic data_avail, task_done, task_success;
 
     logic [63:0] data_to_reverse, reversed_data, read_data;
     logic send_addr;
