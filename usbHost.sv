@@ -27,7 +27,7 @@ module usbHost
   endtask: prelabRequest
 
   // read task wires
-  logic [16:0] rw_mempage;
+  logic [15:0] rw_mempage;
   logic [63:0] rw_data_out;
 
   task readData
@@ -38,18 +38,18 @@ module usbHost
    output bit        success);
 
     $display("readData called with mempage: %0h and data: %0h", mempage, data);
-    rst_b = 1'b0;
-    #5 rst_b = 1'b1;
+    rst_b <= 1'b0;
+    #5 rst_b <= 1'b1;
 
     // Hooking up task inputs to rw fsm
     rw_mempage <= mempage;
-    data <= rw_data_out;
+    data <= data_to_tb;
     success <= rw_task_successful;
     rw_task <= `TASK_READ;
-
-    #5000 
+    wait (task_done);
+    #10; 
     $display("Task success: %0b, returning.", success);
-    return;
+    //return;
   endtask: readData
 
   task writeData
@@ -58,6 +58,19 @@ module usbHost
   (input  bit [15:0] mempage, // Page to write
    input  bit [63:0] data, // array of bytes to write
    output bit        success);
+    
+    $display("readData called with mempage: %0h and data: %0h", mempage, data);
+    rst_b <= 1'b0;
+    #5 rst_b <= 1'b1;
+    rw_mempage <= mempage;
+    data_in <= data;
+    success <= rw_task_successful;
+    rw_task <= `TASK_WRITE;
+    wait (task_done);
+    #10;
+    $display("Task success: %0b, returning.", success);
+    
+    
 
   endtask: writeData
 
