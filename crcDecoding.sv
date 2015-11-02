@@ -37,7 +37,7 @@ module decoding(
     logic sipoDone,sipoRst;
     logic [6:0] sipoMax;
     assign sipoMax = (isToken) ? 7'd35 : (isData ? 7'd99 : 7'd19); //'
-    assign sipoRst = ~rst_b||(nextState==Wait);
+    assign sipoRst = ~rst_b||((nextState==Wait)&&(currState==Wait));
     SIPO_reg sipo(pkt,bitIn,sipoDone,sipoMax,clk,bitInAvail,sipoRst);
 
     //get residues!
@@ -59,7 +59,7 @@ module decoding(
     always_comb begin  //get valid
         pktOutAvail = (nextState==Wait)&&((currState==CRC5)||(currState==CRC16));
         valid = pktOutAvail && (PID==~nPID) && ((
-                residue16==checkR16)||(residue5==checkR5));
+                residue16==checkR16)||(residue5==checkR5)||(PID[3:1]==3'b010));
     end
 
     always_ff @(posedge clk,negedge rst_b) //find PID
