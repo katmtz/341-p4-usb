@@ -209,7 +209,7 @@ module SIPO_reg  //max count
 //	    count <= 0;
 //	  end
 endmodule: SIPO_reg
-
+/*
 module ff(  //initiated to ONE
 	input bit clk, rst,
 	input bit in,
@@ -301,19 +301,7 @@ module PISO_reg( //for OUT/IN: 24+8+3=35, data: 99, hs: 19
 	currState <= nextState;
 endmodule: PISO_reg
 
-
-module revCounter( //actually counts normally wow
-	input logic en, rst, clk,
-	output logic [6:0] index,
-    input logic [6:0] rstIndex);
-
-	always_ff @(posedge clk, posedge rst)
-		if (rst)
-		  index <=rstIndex;  
-		else if (en)
-		  index <= (index!=0) ? index - 1 : 0; //dont wanna be goin negative
-endmodule: revCounter
-
+*/
 
 module maxCounter2( //up to max, different than maxCounter in encoder
 	input logic en, clr, clk,
