@@ -1,4 +1,7 @@
+// module includes
 `include "datapath.sv"
+`include "protocol.sv"
+`include "rw.sv"
 
 // Write your usb host here.  Do not modify the port list.
 module usbHost
@@ -6,22 +9,26 @@ module usbHost
    usbWires wires);
 
   /* Tasks needed to be finished to run testbenches */
-  logic [98:0] pkt;
-  logic pktInAvail;
+  logic [98:0] prelab_pkt;
+  logic prelab_pktInAvail;
 
   task prelabRequest();
       // sends an OUT packet with ADDR=5 and ENDP=4
       // packet should have SYNC and EOP too
       
       $display("Sending an OUT packet....");
-      pkt[98:64] = 35'h00c3d0200;
-      pkt[63:0] = 64'd0;
-      pktInAvail = 1'b1;
-      #20 pktInAvail = 1'b0;
+      prelab_pkt[98:64] = 35'h00c3d0200;
+      prelab_pkt[63:0] = 64'd0;
+      prelab_pktInAvail = 1'b1;
+      #20 prelab_pktInAvail = 1'b0;
 
       #1000;
       $display("Returning from task prelabRequest");
   endtask: prelabRequest
+
+  // read task wires
+  logic [16:0] rw_mempage;
+  logic [63:0] rw_data_out;
 
   task readData
   // host sends memPage to thumb drive and then gets data back from it
@@ -30,6 +37,19 @@ module usbHost
    output bit [63:0] data, // array of bytes to write
    output bit        success);
 
+    $display("readData called with mempage: %0h and data: %0h", mempage, data);
+    rst_b = 1'b0;
+    #5 rst_b = 1'b1;
+
+    // Hooking up task inputs to rw fsm
+    rw_mempage <= mempage;
+    data <= rw_data_out;
+    success <= rw_task_successful;
+    rw_task <= `TASK_READ;
+
+    #5000 
+    $display("Task success: %0b, returning.", success);
+    return;
   endtask: readData
 
   task writeData
