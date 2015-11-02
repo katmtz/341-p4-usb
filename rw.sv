@@ -19,8 +19,6 @@
 `define TASK_READ 2'b01
 `define TASK_WRITE 2'b10
 
-typedef enum [1:0] {idle = 2'b00, read = 2'b01, write = 2'b10} task_t; 
-
 module rw_fsm (clk, rst_b,
                task, mempage, data_in, 
                token_pkt_out, data_pkt_out,
