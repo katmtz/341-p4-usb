@@ -16,7 +16,7 @@ module protocol(
 	output bit success,
 	output bit readyIn,
     output logic [63:0] dataOut,
-	input bit clk, rst);
+	input bit clk, rst_b);
 
 
 	enum logic [2:0] {Wait,ACKsend,NAKsend,TokenSend,
@@ -58,8 +58,8 @@ module protocol(
                     (nextState==HandshakeWait)&&(currState!=HandshakeWait));
     assign tOCen = (currState==DataWait)||(currState==HandshakeWait);
 
-    always_ff @(posedge clk,posedge rst)
-        if (rst||(nextState == Wait))
+    always_ff @(posedge clk,negedge rst_b)
+        if (~rst_b||(nextState == Wait))
             errorCount <= 0;
         else if (gotNAK||timeOut||(pktInAvailDC&&~validDC))
             errorCount <= errorCount + 1;
@@ -103,8 +103,8 @@ module protocol(
             dataOut = 64'd0;
     end    
 
-    always_ff @(posedge clk,posedge rst)
-        if (rst)
+    always_ff @(posedge clk,posedge ~rst_b)
+        if (~rst_b)
             currState <= Wait;
         else
             currState <= nextState;
