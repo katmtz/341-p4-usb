@@ -123,7 +123,7 @@ module transaction_ctrl (clk, rst_b,
             task_done = 1'b1;
             task_success = (state == fail) ? 1'b0 : 1'b1;
         end else begin 
-            task_done = 1'b1;
+            task_done = 1'b0;
             task_success = 1'b0;
         end
     end

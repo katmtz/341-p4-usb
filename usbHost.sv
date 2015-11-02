@@ -53,8 +53,8 @@ module usbHost
     rw_task <= `TASK_READ;
 
     // Let task finish
-    wait (rw_task_done);
-    #10; 
+//    wait (rw_task_done);
+    #1000; 
 
     $display("Task success: %0b, returning.", success);
     // return;
@@ -78,8 +78,8 @@ module usbHost
     rw_task <= `TASK_WRITE;
 
     // Let task finish
-    wait (rw_task_done);
-    #10;
+//    wait (rw_task_done);
+    #1000;
 
     $display("Task success: %0b, returning.", success);
 
