@@ -20,62 +20,70 @@
 `define TASK_WRITE 2'b10
 
 module rw_fsm (clk, rst_b,
-               task, mempage, data_in, 
+               tsk, mempage, data_in, 
                token_pkt_out, data_pkt_out,
-               data_to_tb,
+               data_to_tb, ptcl_data,
                data_avail, ptcl_done, 
                ptcl_success, ptcl_ready,
                task_done, task_success);
 
     input logic clk, rst_b;
-    input logic [1:0] task;
+    input logic [1:0] tsk;
     input logic [15:0] mempage;
     input logic [63:0] data_in;
+    input logic [63:0] ptcl_data;
     input logic ptcl_ready, ptcl_done, ptcl_success;
-    output [18:0] token_out;
-    output [71:0] data_out; 
+    output [18:0] token_pkt_out;
+    output [71:0] data_pkt_out;
+    output [63:0] data_to_tb; 
     output data_avail, task_done, task_success;
 
-    logic [63:0] data_to_reverse, reversed_data;
+    logic [63:0] data_to_reverse, reversed_data, read_data;
     logic send_addr;
     transaction_ctrl ctrl (.*);
-    reverser r (clk, rst_b, data_to_reverse, reversed_data);
+    reverser r (data_to_reverse, reversed_data);
 
     // output data
     always_comb
-        case(task)
+        case(tsk)
             `TASK_IDLE: begin
-                token_out = 19'b0;
+                token_pkt_out = 19'b0;
                 data_to_reverse = 64'b0;
-                data_out = 72'b0;
+                data_pkt_out = 72'b0;
                 data_avail = 1'b0;
             end
             `TASK_READ: begin
                 if (send_addr) begin
-                    token_out = {`OUTPID, `ADDR, `ENDP4};
+                    token_pkt_out = {`OUTPID, `ADDR, `ENDP4};
                     data_to_reverse = {48'b0, mempage};
-                    data_out = {`DATAPID, reversed_data};
+                    data_pkt_out = {`DATAPID, reversed_data};
                     data_avail = 1'b1;
                 end else begin
-                    token_out = {`INPID, `ADDR, `ENDP8};
+                    token_pkt_out = {`INPID, `ADDR, `ENDP8};
                     data_to_reverse = 64'b0;
-                    data_out = 72'b0;
+                    data_pkt_out = 72'b0;
                     data_avail = 1'b1;
                 end
+            end
             `TASK_WRITE: begin
                 if (send_addr) begin
-                    token_out = {`OUTPID, `ADDR, `ENDP4};
+                    token_pkt_out = {`OUTPID, `ADDR, `ENDP4};
                     data_to_reverse = {48'b0, mempage};
-                    data_out = {`DATAPID, reversed_data};
+                    data_pkt_out = {`DATAPID, reversed_data};
                     data_avail = 1'b1;
                 end else begin
-                    token_out = {`OUTPID, `ADDR, `ENDP4};
+                    token_pkt_out = {`OUTPID, `ADDR, `ENDP4};
                     data_to_reverse = data_in;
-                    data_out = {`DATAPID, reversed_data};
+                    data_pkt_out = {`DATAPID, reversed_data};
                     data_avail = 1'b1;
                 end
             end
         endcase
+
+    always_ff @(posedge clk, negedge rst_b) begin
+        if (~rst_b) read_data <= 64'b0;
+        else        read_data <= (ptcl_done && ptcl_success) ? ptcl_data : read_data;
+    end 
 
 endmodule: rw_fsm
 
@@ -86,14 +94,14 @@ endmodule: rw_fsm
  * from the tb
  */
 module transaction_ctrl (clk, rst_b,
-                         task, ptcl_ready,
+                         tsk, ptcl_ready,
                          ptcl_done, ptcl_success,
                          send_addr, task_done, task_success);
 
     input logic clk, rst_b;
-    input logic [1:0] task;
+    input logic [1:0] tsk;
     input logic ptcl_ready, ptcl_done, ptcl_success;
-    ouput logic send_addr, task_done, task_success;
+    output logic send_addr, task_done, task_success;
 
     enum logic [2:0] {idle = 3'b0, 
                       addr = 3'b001, 
@@ -103,7 +111,7 @@ module transaction_ctrl (clk, rst_b,
 
     always_comb
         case(state)
-            idle: nextState = (task != 2'b0) ? addr : idle;
+            idle: nextState = (tsk != 2'b0) ? addr : idle;
             addr: nextState = (~ptcl_done) ? addr : (~ptcl_success) ? fail : data;
             data: nextState = (~ptcl_done) ? data : (~ptcl_success) ? fail : success;
             fail: nextState = fail;
@@ -121,7 +129,7 @@ module transaction_ctrl (clk, rst_b,
     end
 
     always_ff @(posedge clk, negedge rst_b) begin
-        if (~rsb_b) state <= idle;
+        if (~rst_b) state <= idle;
         else        state <= nextState;
     end
 

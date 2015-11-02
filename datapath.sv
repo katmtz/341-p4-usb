@@ -16,7 +16,7 @@ module datapath (clk, rst_b,
                  pkt_in, pkt_in_avail,
                  pkt_out, pkt_out_avail,
                  dp_w, dm_w, dp_r, dm_r,
-                 data_good, decoder_ready, encoder_ready);
+                 data_good, decoder_ready, encoder_ready, re);
 
     input logic clk, rst_b;
     input logic [98:0] pkt_in;      // PROTOCOL FSM --> DATAPATH

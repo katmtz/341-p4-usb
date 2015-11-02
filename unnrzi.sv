@@ -10,8 +10,8 @@ module unnrzi (clk, rst_b,
                bstr_out, bstr_out_ready, out_done);
 
     input logic clk, rst_b;
-    input bit bstr_in, bstr_in_ready;
-    output bit bstr_out, bstr_out_ready;
+    input bit bstr_in, bstr_in_ready, in_done;
+    output bit bstr_out, bstr_out_ready, out_done;
 
     logic bstr_last;
 

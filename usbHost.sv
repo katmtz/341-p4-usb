@@ -31,6 +31,9 @@ module usbHost
   logic [63:0] rw_data_to_tb, rw_data_in;
   logic [1:0] rw_task;
   logic rw_task_done, rw_task_success;
+  logic rst_b, rst_bb;
+
+  assign rst_b = (rst_L && rst_bb);
 
   task readData
   // host sends memPage to thumb drive and then gets data back from it
@@ -40,13 +43,13 @@ module usbHost
    output bit        success);
 
     $display("readData called with mempage: %0h and data: %0h", mempage, data);
-    rst_b <= 1'b0;
-    #5 rst_b <= 1'b1;
+    rst_bb <= 1'b0;
+    #5 rst_bb <= 1'b1;
 
     // Hooking up task inputs to rw fsm
     rw_mempage <= mempage;
     data <= rw_data_to_tb;
-    success <= rw_task_successful;
+    success <= rw_task_success;
     rw_task <= `TASK_READ;
 
     // Let task finish
@@ -65,8 +68,8 @@ module usbHost
    output bit        success);
     
     $display("writeData called with mempage: %0h and data: %0h", mempage, data);
-    rst_b <= 1'b0;
-    #5 rst_b <= 1'b1;
+    rst_bb <= 1'b0;
+    #5 rst_bb <= 1'b1;
     
     // Hooking up inputs
     rw_mempage <= mempage;
@@ -112,7 +115,7 @@ module usbHost
               pkt_into_fsm, data_good, pkt_into_fsm_avail,
               encoder_ready, pkt_from_fsm, pkt_from_fsm_avail,
               ptcl_done, ptcl_success, ptcl_ready, ptcl_data,
-              clk, re);
+              clk, rst_b);
             
   rw_fsm rw (clk, rst_b,
              rw_task, rw_mempage, rw_data_in,

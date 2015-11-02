@@ -6,9 +6,15 @@
  * packet and eop, but not sync
  */
 
-module unstuffer (clk, rst_b,
+module unstuffing (clk, rst_b,
                   bstr_in, bstr_in_avail, in_done,
                   bstr_out, bstr_out_avail, out_done);
+
+    input logic clk, rst_b;
+    input bit bstr_in;
+    input logic bstr_in_avail, in_done;
+    output bit bstr_out;
+    output logic bstr_out_avail, out_done;
 
     logic swp;
     // if string of 6 detected, deassert bstr_out_avail
@@ -18,7 +24,7 @@ module unstuffer (clk, rst_b,
            bstr_out_avail = (bstr_in_avail && ~swp),
            out_done = in_done;  
 
-endmodule: unstuffer
+endmodule: unstuffing
 
 module unstuffer_ctrl (clk, rst_b,
                        bstr_in, bstr_in_avail,

@@ -53,6 +53,7 @@ module r_dpdm(clk, rst_b,
     input bit dp, dm;
     output bit bstr;
     output logic bstr_ready;
+    output logic done;
 
     // seek sync -> send dp & assert bstr -> detect EOP -> deassert pkt avail
     enum logic [1:0] {seek = 2'b00, en = 2'b01, eop = 2'b10} state, nextState;
