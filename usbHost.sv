@@ -91,11 +91,18 @@ module usbHost
 
   datapath d (clk, rst_b,
               pkt_from_fsm, pkt_from_fsm_avail,
-              pkt_into_fsm, pkt_into_fsm_avail,
+              pkt_into_fsm, pkt_into_fsm_avail, //protocol=fsm
               dp_w, dm_w, dp_r, dm_r,
               data_good, decoder_ready, encoder_ready, re);
 
   // <protocol fsm goes here>
+
+    protocol p (token_pkt_in, data_pkt_in,data_avail,
+                pkt_into_fsm,data_good,pkt_into_fsm_avail,
+                encoder_ready, pkt_from_fsm,pkt_from_fsm_avail,
+                ptcl_done, ptcl_success,ptcl_ready,data_in,
+                clk,re);
+            
 
   // <read/write fsm goes here>
 
