@@ -55,7 +55,7 @@ module rw_fsm (clk, rst_b,
             `TASK_READ: begin
                 if (send_addr) begin
                     token_pkt_out = {`OUTPID, `ADDR, `ENDP4};
-                    data_to_reverse = {48'b0, mempage};
+                    data_to_reverse = {mempage, 48'b0};
                     data_pkt_out = {`DATAPID, reversed_data};
                     data_avail = 1'b1;
                 end else begin
@@ -68,7 +68,7 @@ module rw_fsm (clk, rst_b,
             `TASK_WRITE: begin
                 if (send_addr) begin
                     token_pkt_out = {`OUTPID, `ADDR, `ENDP4};
-                    data_to_reverse = {48'b0, mempage};
+                    data_to_reverse = {mempage,48'b0};
                     data_pkt_out = {`DATAPID, reversed_data};
                     data_avail = 1'b1;
                 end else begin

@@ -56,7 +56,7 @@ module reverser(
         reversed[50] = data[13];
         reversed[51] = data[12];
         reversed[52] = data[11];
-        reversed[53] = data[0];
+        reversed[53] = data[10];
         reversed[54] = data[9];
         reversed[55] = data[8];
         reversed[56] = data[7];

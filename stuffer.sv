@@ -7,13 +7,14 @@
 
 module bitstuffing (clk, rst_b,
                     bstr_in, bstr_in_ready,
-                    bstr_out, bstr_out_ready);
+                    bstr_out, bstr_out_ready,
+                    stuffed);
     input logic clk, rst_b;
     input bit bstr_in;
     input logic [1:0] bstr_in_ready;
     output bit bstr_out;
     output logic [1:0] bstr_out_ready;
-
+    output logic [5:0] stuffed;
     bit stream;
     assign stream = bstr_in;
     logic bstr_in_avail;
@@ -28,7 +29,11 @@ module bitstuffing (clk, rst_b,
         else count <= (stream && ~swp) ? count + 1 : 0;
     end
     
-    assign swp = (count == 3'd5);  // if swp: insert a zero bit instead of reading from stream.
+    assign swp = (count == 3'd7);  // if swp: insert a zero bit instead of reading from stream.
+    always_ff @(posedge clk, negedge rst_b, negedge bstr_in_ready)
+        if (~rst_b || (bstr_in_ready==2'b00)) stuffed <=0;
+        else if (swp) stuffed <= stuffed+1;
+
     assign re = ~swp;              // else: read from stream
 
     logic q_empty, q_out;

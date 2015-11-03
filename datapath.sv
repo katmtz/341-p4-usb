@@ -16,7 +16,8 @@ module datapath (clk, rst_b,
                  pkt_in, pkt_in_avail,
                  pkt_out, pkt_out_avail,
                  dp_w, dm_w, dp_r, dm_r,
-                 data_good, decoder_ready, encoder_ready, re);
+                 data_good, decoder_ready, encoder_ready, re,
+                 nrzi_avail);
 
     input logic clk, rst_b;
     input logic [98:0] pkt_in;      // PROTOCOL FSM --> DATAPATH
@@ -29,16 +30,20 @@ module datapath (clk, rst_b,
     output logic data_good;         // DATAPATH     --> PROTOCOL FSM
     output logic decoder_ready;     // DATAPATH     --> PROTOCOL FSM
     output logic encoder_ready;     // DATAPATH     --> PROTOCOL FSM
+    output logic nrzi_avail;
 
     // OUTBOUND PKTS:
     // PROTOCOL FSM --> DPDM
 
     logic crc2stuffer_str, stuffer2nrzi_str, nrzi2dpdm_str;
     logic [1:0] crc2stuffer_ready, stuffer2nrzi_ready, nrzi2dpdm_ready;
+    logic [5:0] stuffed;
 
     encoding    encoder (clk, rst_b, crc2stuffer_ready, pkt_in, pkt_in_avail, crc2stuffer_str, encoder_ready);
-    bitstuffing stuffer (clk, rst_b, crc2stuffer_str, crc2stuffer_ready, stuffer2nrzi_str, stuffer2nrzi_ready);
-    nrzi        nrzier  (clk, rst_b, stuffer2nrzi_str, stuffer2nrzi_ready, nrzi2dpdm_str, nrzi2dpdm_ready);
+    bitstuffing stuffer (clk, rst_b, crc2stuffer_str, crc2stuffer_ready, stuffer2nrzi_str, stuffer2nrzi_ready,stuffed);
+    nrzi        nrzier  (clk, rst_b, stuffer2nrzi_str, stuffer2nrzi_ready, nrzi2dpdm_str, nrzi2dpdm_ready,stuffed);
+
+    assign nrzi_avail = (nrzi2dpdm_ready != 2'b00);
 
     // INBOUND PKTS:
     // DPDM --> PROTOCOL FSM
@@ -55,7 +60,7 @@ module datapath (clk, rst_b,
                           unstuffer2crc_str, unstuffer2crc_ready, unstuffer2crc_done);
 
     unnrzi     unnrzier  (clk, rst_b, 
-                          dpdm2nrzi_str, dpdm2nrzi_str, dpdm2nrzi_done, 
+                          dpdm2nrzi_str, dpdm2nrzi_ready, dpdm2nrzi_done, 
                           nrzi2unstuffer_str, nrzi2unstuffer_ready, nrzi2unstuffer_done);
 
     // I/O

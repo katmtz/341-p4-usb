@@ -55,6 +55,6 @@ module unstuffer_ctrl (clk, rst_b,
         else state <= nextState;
     end
 
-    assign swp = (state == counting && nextState == seek);
+    assign swp = ((state == counting) && (nextState == seek) && (counter==3'd6));
 
 endmodule: unstuffer_ctrl

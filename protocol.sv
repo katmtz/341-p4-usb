@@ -16,19 +16,22 @@ module protocol(
 	output bit success,
 	output bit readyIn,
     output logic [63:0] dataOut,
-	input bit clk, rst_b);
+    //to dp/dm
+    output bit re, //read enable
+	input bit clk, rst_b,
+    input logic nrzi_avail);
 
 
 	enum logic [2:0] {Wait,ACKsend,NAKsend,TokenSend,
 					  DataSend,DataWait,HandshakeWait} currState, nextState; 
 
 	logic [18:0] ack, nak;
-	assign ack = 19'h0a58;  //built in default handshake packets, never change
-	assign nak = 19'h0a50;
+	assign ack = 16'h014b;  //built in default handshake packets, never change
+	assign nak = 16'h0158;
 
 	logic [3:0] tokPID;
-    always_ff @(posedge clk) //determines the packet to send to encoder
-        if (pktInAvailRW) begin	    
+    always_ff @(posedge clk) begin//determines the packet to send to encoder
+        if (pktInAvailRW&&(currState==Wait)) begin	    
             tokPID <= tokenRW[18:15];
             pktOut <= {8'h01,tokenRW,72'd0};
         end
@@ -42,13 +45,14 @@ module protocol(
             pktOut <= 99'd0;
             tokPID <= 4'd0;
         end
+    end
 
 
     logic [3:0] errorCount;//,NAKcount;
     logic gotACK,gotNAK,timeout;
     always_comb begin
-        gotACK = validDC && pktInAvailDC && (pktInDC[90:72]== ack);
-        gotNAK = validDC && pktInAvailDC && (pktInDC[90:72]== nak);
+        gotACK = validDC && pktInAvailDC && (pktInDC[17:2]== ack);
+        gotNAK = validDC && pktInAvailDC && (pktInDC[17:2]== nak);
     end
 
     logic tOCrst,tOCen,timeOut;
@@ -93,7 +97,8 @@ module protocol(
         done = (nextState ==Wait)&&(currState!=Wait);
         success = (errorCount<8);
         readyIn = (currState == Wait);
-        pktOutAvail = readyEC && (nextState != Wait);
+        pktOutAvail = readyEC && (nextState != Wait) && (
+                      (currState != HandshakeWait)&&(currState !=DataWait));
     end
 
     always_comb begin
@@ -102,6 +107,10 @@ module protocol(
         else
             dataOut = 64'd0;
     end    
+
+    //assigning read enable
+    always_ff @(posedge clk)
+        re <= ((currState==DataWait)||(currState==HandshakeWait))&&(~nrzi_avail);
 
     always_ff @(posedge clk,posedge ~rst_b)
         if (~rst_b)

@@ -12,10 +12,15 @@ module usbHost
   logic [98:0] prelab_pkt;
   logic prelab_pktInAvail;
 
+  logic rst_b, rst_bb;
+
+  assign rst_b = (rst_L && rst_bb);
+
   task prelabRequest();
       // sends an OUT packet with ADDR=5 and ENDP=4
       // packet should have SYNC and EOP too
-      
+          rst_bb <= 1'b0;
+    #5 rst_bb <= 1'b1;
       $display("Sending an OUT packet....");
       prelab_pkt[98:64] = 35'h00c3d0200;
       prelab_pkt[63:0] = 64'd0;
@@ -31,9 +36,7 @@ module usbHost
   logic [63:0] rw_data_to_tb, rw_data_in;
   logic [1:0] rw_task;
   logic rw_task_done, rw_task_success;
-  logic rst_b, rst_bb;
 
-  assign rst_b = (rst_L && rst_bb);
 
   task readData
   // host sends memPage to thumb drive and then gets data back from it
@@ -54,7 +57,7 @@ module usbHost
 
     // Let task finish
 //    wait (rw_task_done);
-    #1000; 
+    #3000; 
 
     $display("Task success: %0b, returning.", success);
     // return;
@@ -79,7 +82,7 @@ module usbHost
 
     // Let task finish
 //    wait (rw_task_done);
-    #1000;
+    #3000;
 
     $display("Task success: %0b, returning.", success);
 
@@ -100,11 +103,15 @@ module usbHost
   assign dp_r = wires.DP;
   assign dm_r = wires.DM;
 
+  logic nrzi_ready;
+
   datapath d (clk, rst_b,
               pkt_from_fsm, pkt_from_fsm_avail,
+              //prelab_pkt,prelab_pktInAvail,
               pkt_into_fsm, pkt_into_fsm_avail, //protocol=fsm
               dp_w, dm_w, dp_r, dm_r,
-              data_good, decoder_ready, encoder_ready, re);
+              data_good, decoder_ready, encoder_ready, re,
+              nrzi_avail);
 
   // Protocol/RW wires
   logic [18:0] token_pkt_in;
@@ -116,7 +123,7 @@ module usbHost
               pkt_into_fsm, data_good, pkt_into_fsm_avail,
               encoder_ready, pkt_from_fsm, pkt_from_fsm_avail,
               ptcl_done, ptcl_success, ptcl_ready, ptcl_data,
-              clk, rst_b);
+              re,clk, rst_b,nrzi_avail);
             
   rw_fsm rw (clk, rst_b,
              rw_task, rw_mempage, rw_data_in,

@@ -1,20 +1,22 @@
 // Constants for packet sizes - info bytes + sync
 `define TOK_S 7'd32
-`define HANDSHAKE_S 7'd12
-`define DATA_S 7'd92
+`define HANDSHAKE_S 7'd16
+`define DATA_S 7'd96
 
 module nrzi(clk, rst_b, 
             bstr_in, bstr_in_ready,
-            bstr_out, bstr_out_ready);
+            bstr_out, bstr_out_ready,
+            stuffed);
 
     input bit clk, rst_b, bstr_in;
     input bit [1:0] bstr_in_ready;
     output bit bstr_out;
     output bit [1:0] bstr_out_ready;
+    input logic [5:0] stuffed;
 
     logic use_nrzi, bstr_avail;
     assign bstr_avail = (bstr_in_ready != 2'b0);
-    nrzi_ctrl ctrl (clk, rst_b, bstr_avail, bstr_in_ready, use_nrzi);
+    nrzi_ctrl ctrl (clk, rst_b, bstr_avail, bstr_in_ready, use_nrzi, stuffed);
 
     // calculate the nrzi value if you're supposed to
     reg nrzi_val;
@@ -36,21 +38,24 @@ endmodule
  */
 module nrzi_ctrl(clk, rst_b,
                  bstr_in_ready, p_type,
-                 use_nrzi);
+                 use_nrzi,
+                 stuffed);
 
     input logic clk, rst_b;
     input bit bstr_in_ready;
     input logic [1:0] p_type;
     output logic use_nrzi;
- 
+    input logic [5:0] stuffed;
+
+
     // decide what counter's limit should be;
     logic [6:0] counter_lim;
     always_comb
         case(p_type)
             2'b0: counter_lim = 7'b0;
-            2'b01: counter_lim = `TOK_S;
-            2'b10: counter_lim = `DATA_S;
-            2'b11: counter_lim = `HANDSHAKE_S;
+            2'b01: counter_lim = `TOK_S+stuffed;
+            2'b10: counter_lim = `DATA_S+stuffed;
+            2'b11: counter_lim = `HANDSHAKE_S+stuffed;
         endcase
 
     // increment counter if there's data    

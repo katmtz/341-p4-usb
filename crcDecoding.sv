@@ -57,7 +57,7 @@ module decoding(
     calcR16 ffer16(clk,c16rst,compRemainder16,count,residue16);  //for 5 and 16
 
     always_comb begin  //get valid
-        pktOutAvail = (nextState==Wait)&&((currState==CRC5)||(currState==CRC16));
+        pktOutAvail = (nextState==Wait)&&((currState!=Wait));
         valid = pktOutAvail && (PID==~nPID) && ((
                 residue16==checkR16)||(residue5==checkR5)||(PID[3:1]==3'b010));
     end
@@ -68,8 +68,8 @@ module decoding(
             nPID <= 4'd15;
             end
         else if ((currState==Collect)&&(count==16)) begin //MIGHT GET AN OFF-BY-ONE ERROR: debuggy
-            PID <= pkt[7:4]; 
-            nPID <= pkt[3:0];
+            PID <= pkt[8:5]; 
+            nPID <= pkt[4:1];
             end
 
     always_comb begin //nextstate logic and max of counter

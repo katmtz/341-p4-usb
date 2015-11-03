@@ -1,7 +1,7 @@
 // Constpnts for packet sizes - info bytes + sync
 `define TOK_S 7'd32
-`define HANDSHAKE_S 7'd12
-`define DATA_S 7'd92
+`define HANDSHAKE_S 7'd16
+`define DATA_S 7'd96
 
 /*
  * DP/DM
@@ -71,7 +71,7 @@ module r_dpdm(clk, rst_b,
     end
 
     assign bstr = dp;
-    assign bstr_ready = (state == en || state == eop);
+    assign bstr_ready = (nextState == en || nextState == eop);
     assign done = (state == eop && nextState == seek);
 
 endmodule: r_dpdm

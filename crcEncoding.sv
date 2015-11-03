@@ -7,11 +7,11 @@ module encoding(
 	output bit readyIn);
 
 	enum logic [2:0] {Wait,CRC5Calc,TokenSend,CRC16Calc,
-                      DataSend,HandShakeSend} currState,nextState;
+                      DataSend,HandShakeSend,Done} currState,nextState;
     enum logic [1:0] {None=2'b00, Token = 2'b01, Data = 2'b10, 
                       HandShake=2'b11} pktType;
 
-    assign readyIn = (currState==Wait);
+    assign readyIn = (currState==Wait)||(currState==Done);
 
     logic [3:0] PID; //remember: reversed, so 1000 for out
     assign PID = pkt[90:87];
@@ -55,6 +55,8 @@ module encoding(
     calc5 ffer5(clk,c5rst,addrENDP,count,out5);  //all the flipflop logic
     calc16 ffer16(clk,c16rst,dataBits,count,out16);  //for 5 and 16
 
+    logic full, save;
+
     always_comb
         case (currState)
             Wait: begin
@@ -70,21 +72,25 @@ module encoding(
                 max = 7'd12;
                 end
             CRC16Calc: begin
-                nextState = (count==65) ? DataSend : CRC16Calc;
+                nextState = (count==7'd65) ? DataSend : CRC16Calc;
                 max = 7'd65;
                 end
             TokenSend: begin
-                nextState = (count==35) ? Wait : TokenSend;
+                nextState = full ? Done : TokenSend;
                 max = 7'd35;
                 end
             DataSend: begin
-                nextState = (count==99) ? Wait : DataSend;
+                nextState = full ? Done : DataSend;
                 max = 7'd99;
                 end
             HandShakeSend: begin
-                nextState = (count==19) ? Wait : HandShakeSend;
+                nextState = full ? Done : HandShakeSend;
                 max = 7'd19;
                 end
+            Done: begin
+                nextState = Wait;
+                max = 7'd0;
+            end
             default: begin
                 nextState = Wait;
                 max = 7'd0;
@@ -94,12 +100,12 @@ module encoding(
     logic [98:0] pktToken;
     logic [98:0] pktData, pktToSend;
     logic [98:0] pktHandshake;
-    logic full, save;
+
     logic [6:0] rstIndex;
-    assign pktToSend = (nextState==HandShakeSend) ? pktHandshake : (
-                        nextState==DataSend ? pktData : pktToken);
-    assign rstIndex = (nextState==HandShakeSend) ? 7'd18 : (
-                        nextState==DataSend ? 7'd98 : 7'd34); //'
+    assign pktToSend = (currState==Wait) ? pktHandshake : (
+                        currState==CRC16Calc ? pktData : pktToken);
+    assign rstIndex = (currState==Wait) ? 7'd18 : (
+                        currState==CRC16Calc ? 7'd98 : 7'd34); //'
     PISO_reg piso(bOut,full,put_outbound,pktToSend,rstIndex,clk,save,~rst_b);
         
 
@@ -110,7 +116,8 @@ module encoding(
         pktData = pkt;
         pktHandshake = pkt[98:79];
         save=0;
-        if (((currState==CRC5Calc) || (currState==CRC16Calc)) && (count==11)) begin
+        if (((currState==CRC5Calc)&&(count==11)) || 
+            ((currState==CRC16Calc)&&(count==64))) begin
             save = 1;
             pktToken[7:3] = ~out5[4:0];
             pktData[18:3] = ~out16[15:0];
@@ -135,7 +142,7 @@ module calc16(
 
     logic [15:0] in16;
     logic bstr;
-    assign bstr = index<64 ? data[index] : 0;
+    assign bstr = index<64 ? data[63-index] : 0;
 
     always_comb begin
         in16[0] = out16[15]^bstr;
@@ -182,12 +189,8 @@ module calc5(
 
     logic [4:0] in5;
     logic bstr;
-    logic [10:0] switchedAddrENDP;
-    always_comb begin
-        switchedAddrENDP[6:0] = addrENDP[10:4];
-        switchedAddrENDP[10:7] = addrENDP[3:0];
-    end
-    assign bstr = index<11 ? switchedAddrENDP[index] : 0;
+
+    assign bstr = index<11 ? addrENDP[10-index] : 0;
 
     always_comb begin
         in5[0] = out5[4]^bstr;
@@ -232,7 +235,7 @@ module PISO_reg( //for OUT/IN: 24+8+3=35, data: 99, hs: 19
   
   enum logic [5:0] {Empty,Sending,Last} currState, nextState;
 
-  logic [34:0] savedIn;
+  logic [98:0] savedIn;
   always_ff @(posedge clk, posedge rst)
 	  if (rst)
 		savedIn <= 0;
@@ -281,7 +284,7 @@ module PISO_reg( //for OUT/IN: 24+8+3=35, data: 99, hs: 19
 		end
 		Last: begin
 			full = 1;
-			put_outbound = 1;
+			put_outbound = 0; //1;
 			outBit = savedIn[index];
 		end
 		default: begin
