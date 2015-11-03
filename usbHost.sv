@@ -110,27 +110,33 @@ module usbHost
               //prelab_pkt,prelab_pktInAvail,
               pkt_into_fsm, pkt_into_fsm_avail, //protocol=fsm
               dp_w, dm_w, dp_r, dm_r,
-              data_good, decoder_ready, encoder_ready, re,
-              nrzi_idle);
+              data_good, decoder_ready, encoder_ready, re);
 
   // Protocol/RW wires
   logic [18:0] token_pkt_in;
   logic [71:0] data_pkt_in;
   logic [63:0] ptcl_data;
   logic ptcl_done, ptcl_success, ptcl_read;
+  logic pkt_into_fsm_corrupt;
+  assign pkt_into_fsm_corrupt = ~data_good;
+  logic [1:0] transaction;
 
-  protocol p (token_pkt_in, data_pkt_in, data_avail,
-              pkt_into_fsm, data_good, pkt_into_fsm_avail,
-              encoder_ready, pkt_from_fsm, pkt_from_fsm_avail,
-              ptcl_done, ptcl_success, ptcl_ready, ptcl_data,
-              re,clk, rst_b,nrzi_idle);
+  protocol p (clk, rst_b,
+              transaction, data_avail,
+              data_pkt_in, token_pkt_in,
+              ptcl_data, ptcl_data_avail,
+              ptcl_sent, pctl_success,
+              encoder_ready,
+              pkt_from_fsm, pkt_from_fsm_avail,
+              pkt_into_fsm, pkt_into_fsm_avail,
+              pkt_into_fsm_corrupt, re);
             
   rw_fsm rw (clk, rst_b,
              rw_task, rw_mempage, rw_data_in,
              token_pkt_in, data_pkt_in,
-             rw_data_to_tb, ptcl_data,
+             rw_data_to_tb, ptcl_data, ptcl_sent,
              data_avail, ptcl_done,
-             ptcl_success, ptcl_ready,
+             ptcl_success, transaction,
              rw_task_done, rw_task_success);
 
 endmodule: usbHost

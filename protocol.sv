@@ -1,141 +1,276 @@
-module protocol(
-	//from read/write
-	input logic [18:0] tokenRW,
-	input logic [71:0] dataRW,
-	input bit pktInAvailRW,
-	//from decoder
-	input logic [98:0] pktInDC,
-	input bit validDC,
-	input bit pktInAvailDC,
-	//from/to encoder
-    input bit readyEC, 
-	output logic [98:0] pktOut,
-	output bit pktOutAvail,
-	//to read/write
-	output bit done,
-	output bit success,
-	output bit readyIn,
-    output logic [63:0] dataOut,
-    //to dp/dm
-    output bit re, //read enable
-	input bit clk, rst_b,
-    input logic nrzi_idle);
+// Handshake constants
+`define ACK 19'h014b
+`define NAK 19'h015a
 
+// Transistion Status Constants
+`define TRANS_NON 2'b00
+`define TRANS_IN  2'b01
+`define TRANS_OUT 2'b10
 
-	enum logic [2:0] {Wait,ACKsend,NAKsend,TokenSend,
-					  DataSend,DataWait,HandshakeWait} currState, nextState; 
+// Time Constants
+`define TIMEOUT 8'd255
 
-	logic [18:0] ack, nak;
-	assign ack = 16'h014b;  //built in default handshake packets, never change
-	assign nak = 16'h015a;
+/*
+ * protocol:
+ * - gets transaction type from rw, 
+ * - uses either in or out control fsm
+ * - passes data around according to control pts
+ */
+module protocol(clk, rst_b,
+                transaction, data_in_avail,
+                data_from_rw, token_from_rw,
+                data_to_rw, data_out_avail,
+                pkt_sent, pkt_succeeded,
+                enc_ready,
+                pkt_to_enc, pkt_to_enc_avail,
+                pkt_from_dec, pkt_from_dec_avail,
+                pkt_from_dec_corrupt, re 
+                );
 
-	logic [3:0] tokPID;
-    always_ff @(posedge clk) begin//determines the packet to send to encoder
-        if (pktInAvailRW&&(currState==Wait)) begin	    
-            tokPID <= tokenRW[18:15];
-            pktOut <= {8'h01,tokenRW,72'd0};
-        end
-        else if (nextState==ACKsend)
-            pktOut <= {ack,83'd0};
-        else if (nextState==NAKsend)
-            pktOut <= {nak,83'd0};
-        else if (nextState==DataSend)
-            pktOut <= {8'h01,dataRW,19'd0};
-        else if (nextState==Wait) begin
-            pktOut <= 99'd0;
-            tokPID <= 4'd0;
-        end
-    end
+    input logic clk, rst_b;
 
+    // PROTOCOL <--> RW
+    input [1:0] transaction;
+    input logic data_in_avail;
+    input logic [18:0] token_from_rw;
+    input logic [71:0] data_from_rw;
+    output logic [63:0] data_to_rw;
+    output logic data_out_avail;
+    output logic pkt_sent, pkt_succeeded;
 
-    logic [3:0] errorCount;//,NAKcount;
-    logic gotACK,gotNAK;
+    // PROTOCOL --> ENCODING
+    input logic enc_ready;
+    output logic [98:0] pkt_to_enc;
+    output logic pkt_to_enc_avail;
+
+    // DECODING --> PROTOCOL
+    input logic [98:0] pkt_from_dec;
+    input logic pkt_from_dec_avail;
+    input logic pkt_from_dec_corrupt;
+
+    // PROTOCOL --> DPDM
+    output logic re;
+
+    // CONTROL FSMS
+    logic do_in; 
+    assign do_in = (transaction == `TRANS_IN);
+    logic do_out;
+    assign do_out = (transaction == `TRANS_OUT);
+
+    logic [18:0] pkt_out;
+    logic recieved_nak, send_token;
+    logic in_done, in_success, send_hs, in_data_out_avail, in_re;
+    logic out_done, out_success, send_data,out_data_out_avail, out_re;
+
+    in_ctrl  ic (clk, rst_b, do_in, data_in_avail,
+                 enc_ready, pkt_from_dec_avail, pkt_from_dec_corrupt,
+                 data_out_avail, in_done, in_success, send_hs, in_data_out_avail, in_re);
+    out_ctrl oc (clk, rst_b, do_out, data_in_avail,
+                 enc_ready, pkt_from_dec_avail, pkt_from_dec_corrupt,
+                 recieved_nak, out_done, out_success, out_data_out_avail, send_token, out_re);
+
+    assign re = out_re || in_re;
+    assign pkt_succeeded = out_success || in_success;
+    assign pkt_sent = out_done || in_done;
+    assign pkt_to_enc_avail = out_data_out_avail || in_data_out_avail;
+
+    // PKT MANAGEMENT
+    assign recieved_nak = (pkt_from_dec_avail) ? (pkt_from_dec[17:0] == `NAK) : 0;
+    assign data_to_rw = pkt_from_dec[81:18];
+
+    assign pkt_from_rw = {data_from_rw, 26'b0}; 
+
     always_comb begin
-        gotACK = validDC && pktInAvailDC && (pktInDC[17:2]== ack);
-        gotNAK = validDC && pktInAvailDC && (pktInDC[17:2]== nak);
-    end
-
-    logic tOCrst,tOCen,timeOut;
-
-    timeOutCounter tOC(clk,tOCrst,tOCen,timeOut);
-    assign tOCrst = (((nextState==DataWait)&&(currState!=DataWait))||(
-                    (nextState==HandshakeWait)&&(currState!=HandshakeWait))||~rst_b);
-    assign tOCen = (currState==DataWait)||(currState==HandshakeWait);
-
-    always_ff @(posedge clk,negedge rst_b)
-        if (~rst_b||(nextState == Wait))
-            errorCount <= 0;
-        else if (gotNAK||timeOut||(pktInAvailDC&&~validDC))
-            errorCount <= errorCount + 1;
-
-	always_comb //nextState logic
-		case (currState)
-			Wait:
-                nextState = (tokPID) ? TokenSend : Wait;
-            TokenSend:
-                nextState = readyEC ? ((tokPID == 4'b1000) ?  //check readyEC signal carefully
-                            DataSend : ((tokPID == 4'b1001) ?
-                            DataWait : Wait)) : TokenSend;
-            DataWait:
-                nextState = (pktInAvailDC) ? (validDC ? ACKsend 
-                            : NAKsend) : (timeOut ? NAKsend : DataWait);
-            NAKsend:
-                nextState = (errorCount==8) ? Wait : DataWait;
-            ACKsend:
-                nextState = Wait;
-            DataSend:
-                nextState = HandshakeWait;
-            HandshakeWait:
-                nextState = (gotNAK && (errorCount<8)) ? DataSend : ((
-                            gotACK || (gotNAK))? Wait : (timeOut ?
-                            DataSend : HandshakeWait));
-            default: 
-                nextState = Wait;
+        case(transaction)
+            `TRANS_NON: begin
+                pkt_to_enc = 0;
+            end
+            `TRANS_IN: begin
+                pkt_to_enc = (~send_hs) ? token_from_rw : (pkt_succeeded) ? `ACK : `NAK;
+            end
+            `TRANS_OUT: begin
+                pkt_to_enc = (send_token) ? token_from_rw : pkt_from_rw;
+            end
         endcase
-
-    always_comb begin //success/done/readyIn/pktOutAvail logic
-        done = (nextState ==Wait)&&(currState!=Wait);
-        success = (errorCount<8);
-        readyIn = (currState == Wait);
-        pktOutAvail = readyEC && ((nextState != Wait)||(currState==ACKsend)||(currState==NAKsend)) && (
-                      (currState != HandshakeWait)&&(currState !=DataWait));
-    end
-
-    always_ff @(posedge clk)
-        if (nextState==ACKsend)
-            dataOut <= pktInDC[81:18];
-    
-
-    //assigning read enable
-    always_ff @(posedge clk)
-        re <= ((currState==DataWait)||(currState==HandshakeWait))&&(nrzi_idle);
-
-    always_ff @(posedge clk,posedge ~rst_b)
-        if (~rst_b)
-            currState <= Wait;
-        else
-            currState <= nextState;
+    end        
 
 endmodule: protocol
 
-module timeOutCounter(
-    input logic clk, rst, en,
-    output logic timeOut);
+/*
+ * out_ctrl:
+ * - start when given a transaction
+ * - if done, got either an ack or a final nak
+ * - if success, got an ack
+ */
+module out_ctrl(clk, rst_b,
+                start, data_avail,
+                enc_ready, pkt_from_dec_avail,
+                pkt_from_dec_corrupt,
+                recieved_nak,
+                done, success, data_out_avail, send_token, re);
 
-    logic [7:0] count;
-    assign timeOut = count==8'd255;
+    input logic clk, rst_b, start, data_avail,
+                enc_ready, pkt_from_dec_avail,
+                pkt_from_dec_corrupt,
+                recieved_nak;
+    output logic done, success, data_out_avail, send_token, re;
 
-    always_ff @(posedge clk, posedge rst)
-        if (rst)
-            count <= 0;
-        else if (en)
-            count <= count + 1;
-            
+    logic pkt_sent, retry, timeout;
+    logic data_recieved;
+    logic [7:0] counter;
 
-endmodule: timeOutCounter
+    assign data_recieved = ~recieved_nak && ~pkt_from_dec_corrupt && ~timeout;
 
+    // STATE TRANSISTIONS
+    enum logic [1:0] {idle = 2'b00,
+                      token = 2'b01,
+                      data = 2'b10,
+                      hs = 2'b11} state, nextState;
 
+    always_comb begin
+        case(state)
+            idle: nextState = (start && data_avail) ? token : idle;
+            token: nextState = (pkt_sent) ? data : token;
+            data: nextState = (pkt_sent) ? hs : data;
+            hs: nextState = (data_recieved) ? idle : (retry) ? data : idle;
+        endcase
+    end
 
+    // TIMEOUT
+    logic en, rst;
+    assign en = (state == hs);
+    assign rst = ~en;
+    timeout to (clk, rst_b, en, rst, timeout);
 
+    // STATUS POINTS
 
+    // pkt_sent: was encoder ready when we tried to send last packet
+    always_ff @(posedge clk, negedge rst_b) begin
+        if (~rst_b) pkt_sent <= 1;
+        else        pkt_sent <= enc_ready;
+    end
 
+    // retry: try to send packet again?
+    always_ff @(posedge clk, negedge rst_b) begin
+        if (~rst_b) retry <= 1;
+        else        retry <= (state == hs && ~data_recieved && counter < 7);
+    end
+
+    // counter: track number of naks recieved
+    always_ff @(posedge clk, negedge rst_b) begin
+        if (~rst_b) counter <= 0;
+        else        counter <= (state == idle) ? 0 : (retry) ? counter + 1 : counter;
+    end
+
+    assign done = (state == hs && nextState == idle);
+    assign success = (done & data_recieved);
+    assign send_token = (state == token);
+    assign data_out_avail = (state == token || state == data);
+    assign re = (state == hs);
+
+endmodule: out_ctrl
+
+/*
+ * in_ctrl:
+ * - start when given a transaction
+ * - if done, give up sending naks or send an ack
+ * - if success, send ack
+ * - if send_hs, send ack or nak
+ */
+module in_ctrl(clk, rst_b,
+               start,
+               data_avail, enc_ready,
+               pkt_from_dec_avail,
+               pkt_from_dec_corrupt,
+               data_out_avail,
+               done, success, send_hs, data_to_enc_avail, re); 
+
+    input logic clk, rst_b,
+                start, data_avail,
+                enc_ready,
+                pkt_from_dec_avail,
+                pkt_from_dec_corrupt,
+                data_out_avail;
+    output logic done, success, send_hs, data_to_enc_avail, re;
+                
+    logic pkt_sent, retry, pkt_good, timeout;
+    logic [7:0] counter;
+
+    // STATE TRANSISTIONS
+    enum logic [1:0] {idle  = 2'b00,
+                      token = 2'b01,
+                      data  = 2'b10,
+                      hs    = 2'b11} state, nextState;
+
+    always_comb begin
+        case(state)
+            idle:  nextState = (start && data_avail) ? token : idle;
+            token: nextState = (pkt_sent) ? data : token;
+            data:  nextState = (pkt_from_dec_avail || timeout) ? hs : data;
+            hs:    nextState = (~pkt_sent) ? hs : (retry) ? data : idle;
+        endcase
+    end
+
+    always_ff @(posedge clk, negedge rst_b) begin
+        if (~rst_b) state <= idle;
+        else        state <= nextState;
+    end
+
+    // TIMEOUT
+    logic en, rst;
+    assign en = (state == data);
+    assign rst = (state == idle);
+    timeout to (clk, rst_b, en, rst, timeout);
+
+    // STATUS POINTS
+
+    // pkt_sent: was the encoder ready last time we tried to send
+    always_ff @(posedge clk, negedge rst_b) begin
+        if (~rst_b) pkt_sent <= 0;
+        else        pkt_sent <= enc_ready;
+    end
+
+    // counter: how many times have we retried
+    always_ff @(posedge clk, negedge rst_b) begin
+        if (~rst_b) counter <= 0;
+        else        counter <= (state == idle) ? 0 : (retry) ? counter + 1 : counter;
+    end
+
+    // retry: should we wait for data again
+    always_ff @(posedge clk, negedge rst_b) begin
+        if (~rst_b) retry <= 0;
+        else retry <= (state == data && pkt_from_dec_corrupt && counter < 8); 
+    end
+
+    // pkt_good: 
+    always_ff @(posedge clk, negedge rst_b) begin
+        if (~rst_b) pkt_good <= 0;
+        else        pkt_good <= ((state == data && ~pkt_from_dec_corrupt) && ~timeout);
+    end
+
+    // CONTROL SIGNALS
+    assign re = (state == data);
+    assign done = (state == hs && nextState == idle);
+    assign success = (done && pkt_good);
+    assign send_hs = (state == hs);
+    assign data_to_enc_avail = (state == hs || state == token);
+
+endmodule: in_ctrl
+
+module timeout(clk, rst_b,
+               en, rst,
+               timeout);
+
+    input logic clk, rst_b, en, rst;
+    output logic timeout;
+
+    logic [7:0] counter, counter_in;
+    assign counter_in = (en) ? counter + 1 : 0;
+
+    always_ff @(posedge clk, negedge rst_b) begin
+        if (~rst_b) counter <= 0;
+        else        counter <= (rst) ? 0 : counter_in;
+    end
+
+    assign timeout = (counter == `TIMEOUT);
+endmodule: timeout
