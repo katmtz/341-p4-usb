@@ -27,7 +27,7 @@ module protocol(
 
 	logic [18:0] ack, nak;
 	assign ack = 16'h014b;  //built in default handshake packets, never change
-	assign nak = 16'h0158;
+	assign nak = 16'h015a;
 
 	logic [3:0] tokPID;
     always_ff @(posedge clk) begin//determines the packet to send to encoder

@@ -113,7 +113,7 @@ module calcR16(
 
     logic [15:0] in16;
     logic bstr;
-    assign bstr = index<78 ? compR[78-index] : compR[79];
+    assign bstr = index<79 ? compR[78-index] : compR[79];
 
     always_comb begin
         in16[0] = out16[15]^bstr;
