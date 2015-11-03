@@ -19,7 +19,7 @@ module protocol(
     //to dp/dm
     output bit re, //read enable
 	input bit clk, rst_b,
-    input logic nrzi_avail);
+    input logic nrzi_idle);
 
 
 	enum logic [2:0] {Wait,ACKsend,NAKsend,TokenSend,
@@ -27,7 +27,7 @@ module protocol(
 
 	logic [18:0] ack, nak;
 	assign ack = 16'h014b;  //built in default handshake packets, never change
-	assign nak = 16'h0158;
+	assign nak = 16'h015a;
 
 	logic [3:0] tokPID;
     always_ff @(posedge clk) begin//determines the packet to send to encoder
@@ -49,7 +49,7 @@ module protocol(
 
 
     logic [3:0] errorCount;//,NAKcount;
-    logic gotACK,gotNAK,timeout;
+    logic gotACK,gotNAK;
     always_comb begin
         gotACK = validDC && pktInAvailDC && (pktInDC[17:2]== ack);
         gotNAK = validDC && pktInAvailDC && (pktInDC[17:2]== nak);
@@ -58,8 +58,8 @@ module protocol(
     logic tOCrst,tOCen,timeOut;
 
     timeOutCounter tOC(clk,tOCrst,tOCen,timeOut);
-    assign tOCrst = ((nextState==DataWait)&&(currState!=DataWait))||(
-                    (nextState==HandshakeWait)&&(currState!=HandshakeWait));
+    assign tOCrst = (((nextState==DataWait)&&(currState!=DataWait))||(
+                    (nextState==HandshakeWait)&&(currState!=HandshakeWait))||~rst_b);
     assign tOCen = (currState==DataWait)||(currState==HandshakeWait);
 
     always_ff @(posedge clk,negedge rst_b)
@@ -108,7 +108,7 @@ module protocol(
 
     //assigning read enable
     always_ff @(posedge clk)
-        re <= ((currState==DataWait)||(currState==HandshakeWait))&&(~nrzi_avail);
+        re <= ((currState==DataWait)||(currState==HandshakeWait))&&(nrzi_idle);
 
     always_ff @(posedge clk,posedge ~rst_b)
         if (~rst_b)

@@ -59,9 +59,33 @@ module r_dpdm(clk, rst_b,
     // seek sync -> send dp & assert bstr -> detect EOP -> deassert pkt avail
     enum logic [1:0] {seek = 2'b00, en = 2'b01, eop = 2'b10} state, nextState;
 
+    logic J, K, sync_detected, pattern_break;
+    logic [2:0] sync_count;
+    assign J = (dp == 1'b0 && dm == 1'b1);
+    assign K = (dp == 1'b1 && dm == 1'b0);
+
+    always_ff @(posedge clk, negedge rst_b) begin
+        if (~rst_b) sync_count <= 0;
+	else        sync_count <= (state == seek && ~pattern_break) ? sync_count + 1 : 0;
+    end
+
+    always_comb 
+	case(sync_count)
+	    0: pattern_break = ~J;
+	    1: pattern_break = ~K;
+	    2: pattern_break = ~J;
+	    3: pattern_break = ~K;
+	    4: pattern_break = ~J;
+	    5: pattern_break = ~K;
+	    6: pattern_break = ~J;
+	    7: pattern_break = ~J;
+	endcase
+
+    assign sync_detected = (sync_count == 3'd7);
+
     always_comb
         case (state)
-            seek: nextState = (dp == 1'b0 && dm == 1'b1) ? en : seek;
+            seek: nextState = (sync_detected) ? en : seek;
             en: nextState = (dp == 1'b0 && dm == 1'b0) ? eop : en;
             eop: nextState = (dp == 1'b1 && dm == 1'b0) ? seek : eop;
         endcase  
@@ -72,7 +96,7 @@ module r_dpdm(clk, rst_b,
     end
 
     assign bstr = dp;
-    assign bstr_ready = (nextState == en || nextState == eop);
+    assign bstr_ready = (state == en);
     assign done = (state == eop && nextState == seek);
 
 endmodule: r_dpdm

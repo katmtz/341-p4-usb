@@ -17,7 +17,7 @@ module datapath (clk, rst_b,
                  pkt_out, pkt_out_avail,
                  dp_w, dm_w, dp_r, dm_r,
                  data_good, decoder_ready, encoder_ready, re,
-                 nrzi_avail);
+                 nrzi_idle);
 
     input logic clk, rst_b;
     input logic [98:0] pkt_in;      // PROTOCOL FSM --> DATAPATH
@@ -30,7 +30,7 @@ module datapath (clk, rst_b,
     output logic data_good;         // DATAPATH     --> PROTOCOL FSM
     output logic decoder_ready;     // DATAPATH     --> PROTOCOL FSM
     output logic encoder_ready;     // DATAPATH     --> PROTOCOL FSM
-    output logic nrzi_avail;
+    output logic nrzi_idle;
 
     // OUTBOUND PKTS:
     // PROTOCOL FSM --> DPDM
@@ -43,7 +43,7 @@ module datapath (clk, rst_b,
     bitstuffing stuffer (clk, rst_b, crc2stuffer_str, crc2stuffer_ready, stuffer2nrzi_str, stuffer2nrzi_ready,stuffed_in);
     nrzi        nrzier  (clk, rst_b, stuffer2nrzi_str, stuffer2nrzi_ready, nrzi2dpdm_str, nrzi2dpdm_ready,stuffed_in, stuffed_out);
 
-    assign nrzi_avail = (nrzi2dpdm_ready != 2'b00);
+    assign nrzi_idle = (nrzi2dpdm_ready == 2'b00);
 
     // INBOUND PKTS:
     // DPDM --> PROTOCOL FSM

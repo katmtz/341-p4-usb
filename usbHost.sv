@@ -103,7 +103,7 @@ module usbHost
   assign dp_r = wires.DP;
   assign dm_r = wires.DM;
 
-  logic nrzi_ready;
+  logic nrzi_idle;
 
   datapath d (clk, rst_b,
               pkt_from_fsm, pkt_from_fsm_avail,
@@ -111,7 +111,7 @@ module usbHost
               pkt_into_fsm, pkt_into_fsm_avail, //protocol=fsm
               dp_w, dm_w, dp_r, dm_r,
               data_good, decoder_ready, encoder_ready, re,
-              nrzi_avail);
+              nrzi_idle);
 
   // Protocol/RW wires
   logic [18:0] token_pkt_in;
@@ -123,7 +123,7 @@ module usbHost
               pkt_into_fsm, data_good, pkt_into_fsm_avail,
               encoder_ready, pkt_from_fsm, pkt_from_fsm_avail,
               ptcl_done, ptcl_success, ptcl_ready, ptcl_data,
-              re,clk, rst_b,nrzi_avail);
+              re,clk, rst_b,nrzi_idle);
             
   rw_fsm rw (clk, rst_b,
              rw_task, rw_mempage, rw_data_in,

@@ -47,8 +47,8 @@ module decoding(
     logic [15:0] residue16,checkR16;
     assign checkR5 = 5'b0110;
     assign checkR16 =  16'h800d;   
-    assign compRemainder5 = pkt[17:2];
-    assign compRemainder16 = pkt[81:2];
+    assign compRemainder5 = pkt[16:1];
+    assign compRemainder16 = pkt[80:1];
 
     logic c5rst, c16rst; //assigned based on state
     assign c5rst = (nextState != CRC5)&&(currState != CRC5);
@@ -113,7 +113,7 @@ module calcR16(
 
     logic [15:0] in16;
     logic bstr;
-    assign bstr = index<78 ? compR[78-index] : compR[79];
+    assign bstr = index<79 ? compR[78-index] : compR[79];
 
     always_comb begin
         in16[0] = out16[15]^bstr;
