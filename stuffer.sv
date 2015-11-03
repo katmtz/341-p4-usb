@@ -29,9 +29,13 @@ module bitstuffing (clk, rst_b,
         else count <= (stream && ~swp) ? count + 1 : 0;
     end
     
+   /* always_ff @(posedge clk, negedge rst_b)
+        if (~rst_b) swp <= 0;
+        else swp <= (count==3'd6);
+*/
     assign swp = (count == 3'd7);  // if swp: insert a zero bit instead of reading from stream.
     always_ff @(posedge clk, negedge rst_b, negedge bstr_in_ready)
-        if (~rst_b || (bstr_in_ready==2'b00)) stuffed <=0;
+        if (~rst_b || (bstr_out_ready==2'b00)) stuffed <=0;
         else if (swp) stuffed <= stuffed+1;
 
     assign re = ~swp;              // else: read from stream

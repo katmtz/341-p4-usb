@@ -51,14 +51,14 @@ module usbHost
 
     // Hooking up task inputs to rw fsm
     rw_mempage <= mempage;
-    data <= rw_data_to_tb;
-    success <= rw_task_success;
     rw_task <= `TASK_READ;
 
     // Let task finish
-//    wait (rw_task_done);
-    #3000; 
-
+    wait (rw_task_done);
+    success <= rw_task_success;
+    data <= rw_data_to_tb;
+    @(posedge clk);
+    #100;
     $display("Task success: %0b, returning.", success);
     // return;
   endtask: readData
@@ -77,12 +77,12 @@ module usbHost
     // Hooking up inputs
     rw_mempage <= mempage;
     rw_data_in <= data;
-    success <= rw_task_success;
     rw_task <= `TASK_WRITE;
 
     // Let task finish
-//    wait (rw_task_done);
-    #3000;
+    wait (rw_task_done);
+    success <= rw_task_success;
+    @(posedge clk);
 
     $display("Task success: %0b, returning.", success);
 

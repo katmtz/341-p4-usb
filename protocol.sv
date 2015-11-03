@@ -36,9 +36,9 @@ module protocol(
             pktOut <= {8'h01,tokenRW,72'd0};
         end
         else if (nextState==ACKsend)
-            pktOut <= {8'h01,ack,72'd0};
+            pktOut <= {ack,83'd0};
         else if (nextState==NAKsend)
-            pktOut <= {8'h01,nak,72'd0};
+            pktOut <= {nak,83'd0};
         else if (nextState==DataSend)
             pktOut <= {8'h01,dataRW,19'd0};
         else if (nextState==Wait) begin
@@ -97,16 +97,14 @@ module protocol(
         done = (nextState ==Wait)&&(currState!=Wait);
         success = (errorCount<8);
         readyIn = (currState == Wait);
-        pktOutAvail = readyEC && (nextState != Wait) && (
+        pktOutAvail = readyEC && ((nextState != Wait)||(currState==ACKsend)||(currState==NAKsend)) && (
                       (currState != HandshakeWait)&&(currState !=DataWait));
     end
 
-    always_comb begin
-        if (currState==ACKsend)
-            dataOut = pktInDC[82:19];
-        else
-            dataOut = 64'd0;
-    end    
+    always_ff @(posedge clk)
+        if (nextState==ACKsend)
+            dataOut <= pktInDC[81:18];
+    
 
     //assigning read enable
     always_ff @(posedge clk)

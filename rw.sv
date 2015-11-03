@@ -50,19 +50,16 @@ module rw_fsm (clk, rst_b,
                 token_pkt_out = 19'b0;
                 data_to_reverse = 64'b0;
                 data_pkt_out = 72'b0;
-                data_avail = 1'b0;
             end
             `TASK_READ: begin
                 if (send_addr) begin
                     token_pkt_out = {`OUTPID, `ADDR, `ENDP4};
                     data_to_reverse = {mempage, 48'b0};
                     data_pkt_out = {`DATAPID, reversed_data};
-                    data_avail = 1'b1;
                 end else begin
                     token_pkt_out = {`INPID, `ADDR, `ENDP8};
                     data_to_reverse = 64'b0;
                     data_pkt_out = 72'b0;
-                    data_avail = 1'b1;
                 end
             end
             `TASK_WRITE: begin
@@ -70,12 +67,10 @@ module rw_fsm (clk, rst_b,
                     token_pkt_out = {`OUTPID, `ADDR, `ENDP4};
                     data_to_reverse = {mempage,48'b0};
                     data_pkt_out = {`DATAPID, reversed_data};
-                    data_avail = 1'b1;
                 end else begin
-                    token_pkt_out = {`OUTPID, `ADDR, `ENDP4};
+                    token_pkt_out = {`OUTPID, `ADDR, `ENDP8};
                     data_to_reverse = data_in;
                     data_pkt_out = {`DATAPID, reversed_data};
-                    data_avail = 1'b1;
                 end
             end
         endcase
@@ -84,6 +79,10 @@ module rw_fsm (clk, rst_b,
         if (~rst_b) read_data <= 64'b0;
         else        read_data <= (ptcl_done && ptcl_success) ? ptcl_data : read_data;
     end 
+
+    reverser d2tb(read_data, data_to_tb);
+
+//    assign data_to_tb = read_data;
 
 endmodule: rw_fsm
 
@@ -96,12 +95,14 @@ endmodule: rw_fsm
 module transaction_ctrl (clk, rst_b,
                          tsk, ptcl_ready,
                          ptcl_done, ptcl_success,
-                         send_addr, task_done, task_success);
+                         send_addr, task_done, task_success,
+			 data_avail);
 
     input logic clk, rst_b;
     input logic [1:0] tsk;
     input logic ptcl_ready, ptcl_done, ptcl_success;
     output logic send_addr, task_done, task_success;
+    output logic data_avail;
 
     enum logic [2:0] {idle = 3'b0, 
                       addr = 3'b001, 
@@ -134,5 +135,6 @@ module transaction_ctrl (clk, rst_b,
     end
 
     assign send_addr = (state == addr);
+    assign data_avail = (state == addr || state == data);
 
 endmodule: transaction_ctrl

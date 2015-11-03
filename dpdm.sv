@@ -16,7 +16,7 @@ module dpdm (clk, rst_b,
              w_bstr, w_bstr_ready,
              r_bstr, r_bstr_ready,
              dp_r, dm_r, dp_w, dm_w, 
-             re, done);
+             re, done, stuffed);
 
     input logic clk, rst_b;
     input logic [1:0] w_bstr_ready;           // ENCODING ==> DPDM
@@ -28,10 +28,11 @@ module dpdm (clk, rst_b,
 
     input bit re;                             // PROTOCOL FSM ==> DPDM
     output bit done;                          // DPDM         ==> UNENCODING
+    input logic [5:0] stuffed;
     logic r_ready;
 
     // writing
-    w_dpdm w (clk, rst_b, w_bstr, w_bstr_ready, dp_w, dm_w);
+    w_dpdm w (clk, rst_b, w_bstr, w_bstr_ready, dp_w, dm_w, stuffed);
 
     // reading
     r_dpdm r (clk, rst_b, r_bstr, r_ready, dp_r, dm_r, done);
@@ -83,17 +84,18 @@ endmodule: r_dpdm
  */
 module w_dpdm (clk, rst_b,
              bstr, bstr_ready,
-             dp, dm);
+             dp, dm, stuffed);
 
     input logic clk, rst_b;
     input bit bstr;
     input logic [1:0] bstr_ready;
     output logic dp, dm;
+    input logic [5:0] stuffed;
 
     logic bstr_avail, use_stream, use_SEO, use_J;
     assign bstr_avail = (bstr_ready != 2'b0);
     w_dpdm_ctrl ctrl (clk, rst_b, 
-                      bstr_avail, bstr_ready, 
+                      bstr_avail, bstr_ready, stuffed, 
                       use_stream, use_SEO, use_J);
 
     always_comb begin
@@ -120,12 +122,13 @@ module w_dpdm (clk, rst_b,
 endmodule: w_dpdm
 
 module w_dpdm_ctrl (clk, rst_b,
-                    bstr_ready, p_type,
+                    bstr_ready, p_type, stuffed,
                     use_stream, use_SEO, use_J);
 
     input logic clk, rst_b;
     input bit bstr_ready;
     input logic [1:0] p_type;
+    input logic [5:0] stuffed;
     output logic use_stream, use_SEO, use_J;
 
     // decide what counter's limit should be;
@@ -133,9 +136,9 @@ module w_dpdm_ctrl (clk, rst_b,
     always_comb
         case(p_type)
             2'b0: counter_lim = 7'b0;
-            2'b01: counter_lim = `TOK_S;
-            2'b10: counter_lim = `DATA_S;
-            2'b11: counter_lim = `HANDSHAKE_S;
+            2'b01: counter_lim = `TOK_S + stuffed;
+            2'b10: counter_lim = `DATA_S + stuffed;
+            2'b11: counter_lim = `HANDSHAKE_S + stuffed;
         endcase
 
     // increment counter if there's data

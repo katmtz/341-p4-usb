@@ -36,10 +36,16 @@ module unstuffer_ctrl (clk, rst_b,
 
     enum logic {seek = 1'b0, counting = 1'b1} state, nextState;
     logic [2:0] counter;
+    logic [7:0] pkt_depth;
+
+    always_ff @(posedge clk, negedge rst_b) begin
+	if (~rst_b) pkt_depth = 0;
+	else        pkt_depth = (bstr_in_avail) ? pkt_depth + 1 : 0; 
+    end
 
     always_ff @(posedge clk, negedge rst_b) begin
         if (~rst_b) counter <= 3'b0;
-        else        counter <= (state == counting) ? counter + 1 : 3'b0;
+        else        counter <= ((nextState == counting) && (pkt_depth > 16)) ? counter + 1 : 3'b0;
     end
 
     always_comb begin

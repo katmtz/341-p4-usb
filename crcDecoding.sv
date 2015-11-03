@@ -29,8 +29,8 @@ module decoding(
     logic [6:0] count, max, index; //controls nextState and index of pkt
     assign index = (count>=max) ? 0 : count; 
     logic counterEn,counterClr; //assigned based on state
-    assign counterEn = bitInAvail || ((nextState != Wait)&&(nextState != Collect));
-    assign counterClr = (nextState == Wait);
+    assign counterEn = bitInAvail || ((currState != Wait)&&(currState != Collect));
+    assign counterClr = (currState == Wait);
     maxCounter2 mC(counterEn,counterClr,clk,max,count);
 
     //collect packet
@@ -41,25 +41,25 @@ module decoding(
     SIPO_reg sipo(pkt,bitIn,sipoDone,sipoMax,clk,bitInAvail,sipoRst);
 
     //get residues!
-    logic [4:0] compRemainder5,residue5,checkR5;
-    logic [15:0] compRemainder16,residue16,checkR16;
+    logic [15:0] compRemainder5;
+    logic [4:0] residue5,checkR5;
+    logic [79:0] compRemainder16;
+    logic [15:0] residue16,checkR16;
     assign checkR5 = 5'b0110;
     assign checkR16 =  16'h800d;   
-    assign compRemainder5 = ~pkt[7:3];
-    assign compRemainder16 = ~pkt[18:3];
+    assign compRemainder5 = pkt[17:2];
+    assign compRemainder16 = pkt[81:2];
 
     logic c5rst, c16rst; //assigned based on state
-    assign c5rst = (nextState != CRC5);
-    assign c16rst = (nextState != CRC16);
-    logic [4:0] out5;
-    logic [15:0] out16;
+    assign c5rst = (nextState != CRC5)&&(currState != CRC5);
+    assign c16rst = (nextState != CRC16)&&(currState != CRC16);
     calcR5 ffer5(clk,c5rst,compRemainder5,count,residue5);  //all the flipflop logic
     calcR16 ffer16(clk,c16rst,compRemainder16,count,residue16);  //for 5 and 16
 
     always_comb begin  //get valid
         pktOutAvail = (nextState==Wait)&&((currState!=Wait));
         valid = pktOutAvail && (PID==~nPID) && ((
-                residue16==checkR16)||(residue5==checkR5)||(PID[3:1]==3'b010));
+                residue16==checkR16)||(PID[3:1]==3'b010));
     end
 
     always_ff @(posedge clk,negedge rst_b) //find PID
@@ -78,18 +78,18 @@ module decoding(
             Wait:
                 nextState = bitInAvail ? Collect : Wait;
             Collect: begin
-                max = 7'd99;
                 nextState = ~done ? Collect : (  //CHANGED TO not done instead of bitInAvail
                             isToken ? CRC5 : (isData ?
                             CRC16 : Wait));
+                max = (nextState==CRC16) ? 7'd80 : 7'd99;
             end
             CRC5: begin
-                max = 7'd6;
-                nextState = (count==6) ? Wait : CRC5;
+                max = 7'd15;
+                nextState = (count==15) ? Wait : CRC5;
             end
             CRC16: begin
-                max = 7'd17; //'
-                nextState = (count==17) ? Wait : CRC16;
+                max = 7'd79; //'
+                nextState = (count==7'd79) ? Wait : CRC16;
             end
             default:
                 nextState = Wait;
@@ -107,13 +107,13 @@ endmodule: decoding
 
 module calcR16(
     input bit clk, rst,
-    input logic [15:0] compR,
+    input logic [79:0] compR,
     input logic [6:0] index, //goes up to 17
     output logic [15:0] out16);
 
     logic [15:0] in16;
     logic bstr;
-    assign bstr = index<16 ? compR[15-index] : 0;
+    assign bstr = index<78 ? compR[78-index] : compR[79];
 
     always_comb begin
         in16[0] = out16[15]^bstr;
@@ -150,17 +150,18 @@ module calcR16(
        ff16_d(clk,rst,in16[13],out16[13]),
        ff16_e(clk,rst,in16[14],out16[14]),
        ff16_f(clk,rst,in16[15],out16[15]);
+
 endmodule: calcR16
 
 module calcR5(
     input bit clk, rst,
-    input logic [4:0] compR,
+    input logic [15:0] compR,
     input logic [6:0] index, //goes up to 6
     output logic [4:0] out5);
 
     logic [4:0] in5;
     logic bstr;
-    assign bstr = index<5 ? compR[4-index] : 0;
+    assign bstr = index<16 ? compR[15-index] : 0;
 
     always_comb begin
         in5[0] = out5[4]^bstr;
@@ -204,104 +205,9 @@ module SIPO_reg  //max count
 	    q <= (q << 1) | inBit;
 	    count <= (count==99) ? 0 : (count+1);
 	    end
-//	  else begin
-//	    q <= q;
-//	    count <= 0;
-//	  end
+
 endmodule: SIPO_reg
-/*
-module ff(  //initiated to ONE
-	input bit clk, rst,
-	input bit in,
-	output bit out);
 
-	always_ff @(posedge clk, posedge rst)
-		if(rst)
-			out <= 1;
-		else
-			out <= in;
-
-endmodule: ff
-
-
-
-module PISO_reg( //for OUT/IN: 24+8+3=35, data: 99, hs: 19
-  output logic outBit,
-  output logic full,
-  output logic put_outbound,
-  input logic [98:0] in,
-  input logic [6:0] rstIndex,
-  input logic clk, save, rst);
-  
-  enum logic [5:0] {Empty,Sending,Last} currState, nextState;
-
-  logic [34:0] savedIn;
-  always_ff @(posedge clk, posedge rst)
-	  if (rst)
-		savedIn <= 0;
-	  else if (save && (currState == Empty))
-		savedIn <= in;
-
-  logic counterEn,counterClr;
-  logic [6:0] index;
-  revCounter revC(counterEn,counterClr,clk,index, rstIndex);
-
-  always_comb
-	  case (currState)
-		Empty:
-			nextState = save ? Sending : Empty;
-		Sending:
-			nextState = index>0 ? Sending : Last;
-		Last:
-			nextState = Empty;
-		default:
-		  nextState = Empty;  //'
-	  endcase
-  
-  always_comb begin
-  	if (currState == Sending) begin
-  		counterClr = 0;
-  		counterEn = 1;
-  		end
-  	else begin
-  		counterClr = (nextState==Empty) ? 1'b1 : rst;//'
-  		counterEn = 0;
-  		end
-
-  end
-  always_comb begin
-	  case (currState)
-		Empty: begin
-			full = 0;
-			put_outbound = 0;
-			outBit = 0;
-		end
-		Sending: begin
-			full = save;
-			put_outbound = 1;
-			outBit = savedIn[index];
-		end
-		Last: begin
-			full = 1;
-			put_outbound = 1;
-			outBit = savedIn[index];
-		end
-		default: begin
-			full = 0;
-			put_outbound = 0;
-			outBit = 0;
-		end
-	  endcase
-	end
-  
-  always_ff @(posedge clk,posedge rst)
-	  if (rst)
-	currState <= Empty;
-	  else
-	currState <= nextState;
-endmodule: PISO_reg
-
-*/
 
 module maxCounter2( //up to max, different than maxCounter in encoder
 	input logic en, clr, clk,
@@ -309,7 +215,7 @@ module maxCounter2( //up to max, different than maxCounter in encoder
 	output logic [6:0] count);
 
 	always_ff @(posedge clk, posedge clr)
-        if (clr || (count==max))
+        if (clr || (count>=max))
             count <=0;
 		else if (en) 
 		    count <= count + 1;

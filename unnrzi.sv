@@ -21,7 +21,7 @@ module unnrzi (clk, rst_b,
     end
 
     assign bstr_out = (bstr_in == bstr_last),//(bstr_in_ready && (bstr_in == bstr_last)),
-           bstr_out_ready = bstr_in_ready||in_done,
+           bstr_out_ready = bstr_in_ready,
            out_done = in_done;
 
 endmodule: unnrzi

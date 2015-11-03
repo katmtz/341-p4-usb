@@ -37,11 +37,11 @@ module datapath (clk, rst_b,
 
     logic crc2stuffer_str, stuffer2nrzi_str, nrzi2dpdm_str;
     logic [1:0] crc2stuffer_ready, stuffer2nrzi_ready, nrzi2dpdm_ready;
-    logic [5:0] stuffed;
+    logic [5:0] stuffed_in, stuffed_out;
 
     encoding    encoder (clk, rst_b, crc2stuffer_ready, pkt_in, pkt_in_avail, crc2stuffer_str, encoder_ready);
-    bitstuffing stuffer (clk, rst_b, crc2stuffer_str, crc2stuffer_ready, stuffer2nrzi_str, stuffer2nrzi_ready,stuffed);
-    nrzi        nrzier  (clk, rst_b, stuffer2nrzi_str, stuffer2nrzi_ready, nrzi2dpdm_str, nrzi2dpdm_ready,stuffed);
+    bitstuffing stuffer (clk, rst_b, crc2stuffer_str, crc2stuffer_ready, stuffer2nrzi_str, stuffer2nrzi_ready,stuffed_in);
+    nrzi        nrzier  (clk, rst_b, stuffer2nrzi_str, stuffer2nrzi_ready, nrzi2dpdm_str, nrzi2dpdm_ready,stuffed_in, stuffed_out);
 
     assign nrzi_avail = (nrzi2dpdm_ready != 2'b00);
 
@@ -69,6 +69,6 @@ module datapath (clk, rst_b,
                          nrzi2dpdm_str, nrzi2dpdm_ready, 
                          dpdm2nrzi_str, dpdm2nrzi_ready, 
                          dp_r, dm_r, dp_w, dm_w, 
-                         re, dpdm2nrzi_done);
+                         re, dpdm2nrzi_done, stuffed_out);
 
 endmodule: datapath

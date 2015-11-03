@@ -9,7 +9,7 @@ module encoding(
 	enum logic [2:0] {Wait,CRC5Calc,TokenSend,CRC16Calc,
                       DataSend,HandShakeSend,Done} currState,nextState;
     enum logic [1:0] {None=2'b00, Token = 2'b01, Data = 2'b10, 
-                      HandShake=2'b11} pktType;
+                      HandShake=2'b11} pktType,pktTypeSaved;
 
     assign readyIn = (currState==Wait)||(currState==Done);
 
@@ -20,6 +20,8 @@ module encoding(
     logic [63:0] dataBits;
     assign addrENDP = pkt[82:72]; //will only matter if token
     assign dataBits = pkt[82:19]; //will only matter if data
+
+   
 
     always_comb //assign packet types
         case (PID)
@@ -36,8 +38,26 @@ module encoding(
             default:
                 pktType = None;
         endcase
+    always_ff @(posedge clk) //assign packet types
+        if (currState==Wait)        
+        case (PID)
+            4'b1000:
+                pktTypeSaved <= Token;
+            4'b1001:
+                pktTypeSaved <= Token;
+            4'b1100:
+                pktTypeSaved <= Data;
+            4'b0100:
+                pktTypeSaved <= HandShake;
+            4'b0101:
+                pktTypeSaved <= HandShake;
+            default:
+                pktTypeSaved <= None;
+        endcase
+
+
     logic put_outbound;
-    assign ready = put_outbound ? pktType : 2'b00; //'
+    assign ready = put_outbound ? (pktTypeSaved) : 2'b00; //'
 
 
     logic [6:0] count, max, index; //controls nextState and index of pkt
@@ -114,8 +134,8 @@ module encoding(
         pktHandshake = 98'd0;
         pktToken = pkt[98:64];
         pktData = pkt;
-        pktHandshake = pkt[98:79];
-        save=0;
+        pktHandshake = pkt[98:79]>>1;
+        save=(pktType==HandShake);
         if (((currState==CRC5Calc)&&(count==11)) || 
             ((currState==CRC16Calc)&&(count==64))) begin
             save = 1;
