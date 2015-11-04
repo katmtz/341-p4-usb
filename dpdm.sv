@@ -62,8 +62,8 @@ module r_dpdm(clk, rst_b,
 
     logic J, K, sync_detected, pattern_break;
     logic [2:0] sync_count;
-    assign J = (dp == 1'b0 && dm == 1'b1);
-    assign K = (dp == 1'b1 && dm == 1'b0);
+    assign J = (dp == 1'b1 && dm == 1'b0);
+    assign K = (dp == 1'b0 && dm == 1'b1);
 
     always_ff @(posedge clk, negedge rst_b) begin
         if (~rst_b) sync_count <= 0;
@@ -72,22 +72,23 @@ module r_dpdm(clk, rst_b,
 
     always_comb 
 	case(sync_count)
-	    0: pattern_break = ~J;
-	    1: pattern_break = ~K;
-	    2: pattern_break = ~J;
-	    3: pattern_break = ~K;
-	    4: pattern_break = ~J;
-	    5: pattern_break = ~K;
-	    6: pattern_break = ~J;
-	    7: pattern_break = ~J;
+	    0: pattern_break = ~K;
+	    1: pattern_break = ~J;
+	    2: pattern_break = ~K;
+	    3: pattern_break = ~J;
+	    4: pattern_break = ~K;
+	    5: pattern_break = ~J;
+	    6: pattern_break = ~K;
+	    7: pattern_break = ~K;
 	endcase
 
-    assign sync_detected = (sync_count == 3'd6) && J;
+    assign sync_detected = (sync_count == 3'd7);
+    assign eop_detected = (dp == 1'b0 && dm == 1'b0);
 
     always_comb
         case (state)
             seek: nextState = (sync_detected) ? en : seek;
-            en: nextState = (dp == 1'b0 && dm == 1'b0) ? eop : en;
+            en: nextState = (eop_detected) ? eop : en;
             eop: nextState = (dp == 1'b1 && dm == 1'b0) ? seek : eop;
         endcase  
 
@@ -97,7 +98,7 @@ module r_dpdm(clk, rst_b,
     end
 
     assign bstr = dp;
-    assign bstr_ready = (state == en);
+    assign bstr_ready = (state == en && ~eop_detected);
     assign done = (state == eop && nextState == seek);
 
 endmodule: r_dpdm
