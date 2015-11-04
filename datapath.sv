@@ -21,7 +21,7 @@ module datapath (clk, rst_b,
     input logic clk, rst_b;
     input logic [98:0] pkt_in;      // PROTOCOL FSM --> DATAPATH
     input logic pkt_in_avail;       // PROTOCOL FSM --> DATAPATH
-    input logic re;                 // PROTOCOL FSM --> DPDM
+    output logic re;                 // PROTOCOL FSM --> DPDM
     input logic dp_r, dm_r;         // DEVICE       --> DPDM
     output logic [98:0] pkt_out;    // DATAPATH     --> PROTOCOL FSM
     output logic pkt_out_avail;     // DATAPATH     --> PROTCOL FSM
@@ -37,7 +37,7 @@ module datapath (clk, rst_b,
     logic [1:0] crc2stuffer_ready, stuffer2nrzi_ready, nrzi2dpdm_ready;
     logic [5:0] stuffed_in, stuffed_out;
 
-    encoding    encoder (clk, rst_b, crc2stuffer_ready, pkt_in, pkt_in_avail, crc2stuffer_str, encoder_ready);
+    encoding    encoder (clk, rst_b, crc2stuffer_ready, pkt_in, pkt_in_avail, crc2stuffer_str, encoder_ready, re);
     bitstuffing stuffer (clk, rst_b, crc2stuffer_str, crc2stuffer_ready, stuffer2nrzi_str, stuffer2nrzi_ready,stuffed_in);
     nrzi        nrzier  (clk, rst_b, stuffer2nrzi_str, stuffer2nrzi_ready, nrzi2dpdm_str, nrzi2dpdm_ready,stuffed_in, stuffed_out);
 

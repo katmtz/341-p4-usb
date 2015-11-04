@@ -26,7 +26,7 @@ module protocol(clk, rst_b,
                 pkt_sent, dec_ready,
                 pkt_to_enc, pkt_to_enc_avail,
                 pkt_from_dec, pkt_from_dec_avail,
-                pkt_from_dec_corrupt, re 
+                pkt_from_dec_corrupt 
                 );
 
     input logic clk, rst_b;
@@ -51,9 +51,6 @@ module protocol(clk, rst_b,
                 pkt_from_dec_corrupt,
                 dec_ready;
 
-    // PROTOCOL --> DPDM
-    output logic re;
-
     // CONTROL FSMS
     logic do_in; 
     assign do_in = (transaction == `TRANS_IN);
@@ -61,17 +58,16 @@ module protocol(clk, rst_b,
     assign do_out = (transaction == `TRANS_OUT);
 
     logic recieved_nak;
-    logic in_done, in_success, send_hs, in_data_to_enc_avail, in_re;
-    logic out_done, out_success, send_token,out_data_to_enc_avail, out_re;
+    logic in_done, in_success, send_hs, in_data_to_enc_avail;
+    logic out_done, out_success, send_token,out_data_to_enc_avail;
 
     in_ctrl  ic (clk, rst_b, do_in, data_from_rw_avail,
                  pkt_sent, pkt_from_dec_avail, pkt_from_dec_corrupt,
-                 in_done, in_success, send_hs, in_data_to_enc_avail, in_re);
+                 in_done, in_success, send_hs, in_data_to_enc_avail);
     out_ctrl oc (clk, rst_b, do_out, data_from_rw_avail,
                  pkt_sent, pkt_from_dec_avail, pkt_from_dec_corrupt,
-                 recieved_nak, out_done, out_success, out_data_to_enc_avail, send_token, out_re);
+                 recieved_nak, out_done, out_success, out_data_to_enc_avail, send_token);
 
-    assign re = (do_out) ? out_re : in_re;
     assign pkt_succeeded = (do_out) ? out_success : in_success;
     assign pkt_done = (do_out) ? out_done : in_done;
     assign pkt_to_enc_avail = (do_out) ? out_data_to_enc_avail : in_data_to_enc_avail;
@@ -110,13 +106,13 @@ module out_ctrl(clk, rst_b,
                 pkt_sent, pkt_from_dec_avail,
                 pkt_from_dec_corrupt,
                 recieved_nak,
-                done, success, data_to_enc_avail, send_token, re);
+                done, success, data_to_enc_avail, send_token);
 
     input logic clk, rst_b, start, data_from_rw_avail,
                 pkt_from_dec_avail, pkt_sent,
                 pkt_from_dec_corrupt,
                 recieved_nak;
-    output logic done, success, data_to_enc_avail, send_token, re;
+    output logic done, success, data_to_enc_avail, send_token;
 
     logic retry, timeout;
     logic data_recieved;
@@ -167,7 +163,6 @@ module out_ctrl(clk, rst_b,
     assign success = (done & data_recieved);
     assign send_token = (state == token);
     assign data_to_enc_avail = (state == token || state == data);
-    assign re = (state == hs);
 
 endmodule: out_ctrl
 
@@ -183,14 +178,14 @@ module in_ctrl(clk, rst_b,
                data_avail, enc_ready,
                pkt_from_dec_avail,
                pkt_from_dec_corrupt,
-               done, success, send_hs, data_to_enc_avail, re); 
+               done, success, send_hs, data_to_enc_avail); 
 
     input logic clk, rst_b,
                 start, data_avail,
                 enc_ready,
                 pkt_from_dec_avail,
                 pkt_from_dec_corrupt;
-    output logic done, success, send_hs, data_to_enc_avail, re;
+    output logic done, success, send_hs, data_to_enc_avail;
                 
     logic pkt_sent, retry, pkt_good, timeout;
     logic [7:0] counter;
@@ -248,7 +243,6 @@ module in_ctrl(clk, rst_b,
     end
 
     // CONTROL SIGNALS
-    assign re = (state == data);
     assign done = (state == hs && nextState == idle);
     assign success = (done && pkt_good);
     assign send_hs = (state == hs);

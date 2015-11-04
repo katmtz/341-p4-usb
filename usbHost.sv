@@ -91,11 +91,11 @@ module usbHost
   // PROTOCOL FSM <--> DATAPATH
   logic [98:0] pkt_from_fsm, pkt_into_fsm;
   logic pkt_from_fsm_avail, pkt_into_fsm_avail, data_good, 
-        pkt_into_fsm_corrupt, decoder_ready, send_done, re;
+        pkt_into_fsm_corrupt, decoder_ready, send_done;
   assign pkt_into_fsm_corrupt = ~data_good;
 
   // TRISTATE DRIVING
-  logic dp_w, dm_w, dp_r, dm_r;
+  logic dp_w, dm_w, dp_r, dm_r, re;
 
   assign wires.DP = (~re) ? dp_w : 1'bz;
   assign wires.DM = (~re) ? dm_w : 1'bz;
@@ -125,7 +125,7 @@ module usbHost
               send_done, decoder_ready,
               pkt_from_fsm, pkt_from_fsm_avail,
               pkt_into_fsm, pkt_into_fsm_avail,
-              pkt_into_fsm_corrupt, re);
+              pkt_into_fsm_corrupt);
             
   rw_fsm rw (clk, rst_b,
              rw_task, rw_mempage, rw_data_in,
