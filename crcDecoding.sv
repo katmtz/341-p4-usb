@@ -15,16 +15,8 @@ module decoding(
     bit isToken,isData;
     logic [3:0] PID, nPID;
 
-    always_ff @(posedge clk,negedge rst_b)
-        if (~rst_b||(currState==Wait)) begin
-            isToken <= 0;
-            isData <= 0;
-            end
-        else if (PID[3:1]==3'b100)
-            isToken <= 1;
-        else if (PID[3:0]==4'b1100)
-            isData <= 1;
-
+    assign isToken = (PID[3:1] == 3'b100);
+    assign isData = (PID[3:0] == 4'b1100);
 
     logic [6:0] count, max, index; //controls nextState and index of pkt
     assign index = (count>=max) ? 0 : count; 
@@ -62,15 +54,8 @@ module decoding(
                 residue16==checkR16)||(PID[3:1]==3'b010));
     end
 
-    always_ff @(posedge clk,negedge rst_b) //find PID
-        if (~rst_b||(currState==Wait)) begin
-            PID <= 4'd0;
-            nPID <= 4'd15;
-            end
-        else if ((currState==Collect)&&(count==16)) begin //MIGHT GET AN OFF-BY-ONE ERROR: debuggy
-            PID <= pkt[8:5]; 
-            nPID <= pkt[4:1];
-            end
+    assign nPID = (pktOutAvail) ? pkt[3:0] : 0;
+    assign PID = (pktOutAvail) ? pkt[7:4] : 0;
 
     always_comb begin //nextstate logic and max of counter
         max = 7'd0; //default value: doesn't matter, not counting
