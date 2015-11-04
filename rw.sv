@@ -20,7 +20,7 @@
 `define TASK_WRITE 2'b10
 
 module rw_fsm (clk, rst_b,
-               task, mempage, data,
+               tsk, mempage, data_from_tb,
                tok_pkt_into_ptcl, data_pkt_into_ptcl,
                data_into_ptcl_avail,
                data_from_ptcl, data_from_ptcl_avail,
@@ -30,14 +30,15 @@ module rw_fsm (clk, rst_b,
     input logic clk, rst_b;
     input logic [1:0] tsk;
     input logic [15:0] mempage;
-    input logic [63:0] data;
+    input logic [63:0] data_from_tb;
     input logic [63:0] data_from_ptcl;
+    input logic data_from_ptcl_avail;
     input logic transaction_done, transaction_success;
-    output logic [18:0] token_pkt_into_ptcl;
+    output logic [18:0] tok_pkt_into_ptcl;
     output logic [71:0] data_pkt_into_ptcl;
     output logic [63:0] data_to_tb; 
     output logic [1:0] transaction;
-    output logic data_into_ptcl_avail, data_from_ptcl_avail;
+    output logic data_into_ptcl_avail;
     output logic task_done, task_success;
 
     logic [63:0] data_to_reverse, reversed_data, read_data;
@@ -49,37 +50,37 @@ module rw_fsm (clk, rst_b,
     always_comb
         case(tsk)
             `TASK_IDLE: begin
-                token_pkt_out = 19'b0;
+                tok_pkt_into_ptcl = 19'b0;
                 data_to_reverse = 64'b0;
-                data_pkt_out = 72'b0;
+                data_pkt_into_ptcl = 72'b0;
             end
             `TASK_READ: begin
                 if (send_addr) begin
-                    token_pkt_out = {`OUTPID, `ADDR, `ENDP4};
+                    tok_pkt_into_ptcl = {`OUTPID, `ADDR, `ENDP4};
                     data_to_reverse = {mempage, 48'b0};
-                    data_pkt_out = {`DATAPID, reversed_data};
+                    data_pkt_into_ptcl = {`DATAPID, reversed_data};
                 end else begin
-                    token_pkt_out = {`INPID, `ADDR, `ENDP8};
+                    tok_pkt_into_ptcl = {`INPID, `ADDR, `ENDP8};
                     data_to_reverse = 64'b0;
-                    data_pkt_out = 72'b0;
+                    data_pkt_into_ptcl = 72'b0;
                 end
             end
             `TASK_WRITE: begin
                 if (send_addr) begin
-                    token_pkt_out = {`OUTPID, `ADDR, `ENDP4};
+                    tok_pkt_into_ptcl = {`OUTPID, `ADDR, `ENDP4};
                     data_to_reverse = {mempage,48'b0};
-                    data_pkt_out = {`DATAPID, reversed_data};
+                    data_pkt_into_ptcl = {`DATAPID, reversed_data};
                 end else begin
-                    token_pkt_out = {`OUTPID, `ADDR, `ENDP8};
-                    data_to_reverse = data_in;
-                    data_pkt_out = {`DATAPID, reversed_data};
+                    tok_pkt_into_ptcl = {`OUTPID, `ADDR, `ENDP8};
+                    data_to_reverse = data_from_tb;
+                    data_pkt_into_ptcl = {`DATAPID, reversed_data};
                 end
             end
         endcase
 
     always_ff @(posedge clk, negedge rst_b) begin
         if (~rst_b) read_data <= 64'b0;
-        else        read_data <= (ptcl_done && ptcl_success) ? ptcl_data : read_data;
+        else        read_data <= (transaction_done && transaction_success) ? data_from_ptcl : read_data;
     end 
 
     reverser d2tb(read_data, data_to_tb);
@@ -92,17 +93,16 @@ endmodule: rw_fsm
  * an address then either waiting for data to come in or sending data
  * from the tb
  */
-module transaction_ctrl (clk, rst_b,
-                         tsk, pkt_sent,
-                         ptcl_done, ptcl_success,
+module transaction_ctrl (clk, rst_b, tsk,
+                         transaction_done, transaction_success,
                          send_addr, task_done, task_success,
-			             data_avail, transaction);
+			             data_into_ptcl_avail, transaction);
 
     input logic clk, rst_b;
     input logic [1:0] tsk;
-    input logic pkt_sent, ptcl_done, ptcl_success;
+    input logic transaction_done, transaction_success;
     output logic send_addr, task_done, task_success;
-    output logic data_avail;
+    output logic data_into_ptcl_avail;
     output logic [1:0] transaction;
 
     enum logic [2:0] {idle = 3'b0, 
@@ -111,15 +111,13 @@ module transaction_ctrl (clk, rst_b,
                       success = 3'b011,
                       fail = 3'b100} state, nextState;
 
-    enum logic {in = 1'b1, out = 1'b0} transState;
-
     always_comb
         case(state)
             idle: nextState = (tsk != 2'b0) ? addr : idle;
-            addr: nextState = (~ptcl_done) ? addr : (~ptcl_success) ? fail : data;
-            data: nextState = (~ptcl_done) ? data : (~ptcl_success) ? fail : success;
-            fail: nextState = fail;
-            success: nextState = success;
+            addr: nextState = (~transaction_done) ? addr : (~transaction_success) ? fail : data;
+            data: nextState = (~transaction_done) ? data : (~transaction_success) ? fail : success;
+            fail: nextState = (tsk != 2'b0) ? fail : idle;
+            success: nextState = (tsk != 2'b0) ? success : idle;
         endcase
 
     always_comb begin
@@ -134,9 +132,9 @@ module transaction_ctrl (clk, rst_b,
 
     always_comb begin
         transaction = 0;
-        if (transState == out)
+        if (state == addr || tsk == `TASK_WRITE)
             transaction = 2'b10;
-        if (transState == in)
+        if (state == data && tsk == `TASK_READ)
             transaction = 2'b01;
     end
 
@@ -145,12 +143,7 @@ module transaction_ctrl (clk, rst_b,
         else        state <= nextState;
     end
 
-    always_ff @(posedge clk, negedge rst_b) begin
-        if (~rst_b) transState <= out;
-        else        transState <= (pkt_sent && tsk == `TASK_READ) ? in : transState;
-    end
-
     assign send_addr = (state == addr);
-    assign data_avail = tsk != 0;
+    assign data_into_ptcl_avail = tsk != 0;
 
 endmodule: transaction_ctrl

@@ -57,9 +57,8 @@ module usbHost
     success <= rw_task_success;
     data <= rw_data_to_tb;
     @(posedge clk);
-    #100;
     $display("Task success: %0b, returning.", success);
-      // return;
+    rw_task <= `TASK_IDLE;
   endtask: readData
 
   task writeData
@@ -78,14 +77,13 @@ module usbHost
     rw_data_in <= data;
     rw_task <= `TASK_WRITE;
 
-    #1000
     // Let task finish
-  //  wait (rw_task_done);
+    wait (rw_task_done);
     success <= rw_task_success;
     @(posedge clk);
 
     $display("Task success: %0b, returning.", success);
-
+    rw_task <= `TASK_IDLE;
   endtask: writeData
 
   // BEGIN CONNECTIONS
@@ -93,7 +91,7 @@ module usbHost
   // PROTOCOL FSM <--> DATAPATH
   logic [98:0] pkt_from_fsm, pkt_into_fsm;
   logic pkt_from_fsm_avail, pkt_into_fsm_avail, data_good, 
-        pkt_into_fsm_corrupt, decoder_ready, encoder_ready, re;
+        pkt_into_fsm_corrupt, decoder_ready, send_done, re;
   assign pkt_into_fsm_corrupt = ~data_good;
 
   // TRISTATE DRIVING
@@ -117,14 +115,14 @@ module usbHost
               pkt_from_fsm, pkt_from_fsm_avail,
               pkt_into_fsm, pkt_into_fsm_avail,
               dp_w, dm_w, dp_r, dm_r,
-              data_good, decoder_ready, encoder_ready, re);
+              data_good, decoder_ready, send_done, re);
 
   protocol p (clk, rst_b,
-              transaction, data_pkt_into_ptcl_avail,
+              transaction, data_into_ptcl_avail,
               data_pkt_into_ptcl, tok_pkt_into_ptcl,
               data_from_ptcl, data_from_ptcl_avail,
               transaction_done, transaction_success,
-              encoder_ready, decoder_ready,
+              send_done, decoder_ready,
               pkt_from_fsm, pkt_from_fsm_avail,
               pkt_into_fsm, pkt_into_fsm_avail,
               pkt_into_fsm_corrupt, re);
