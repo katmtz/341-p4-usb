@@ -48,12 +48,13 @@ module decoding(
     calcR5 ffer5(clk,c5rst,compRemainder5,count,residue5);  //all the flipflop logic
     calcR16 ffer16(clk,c16rst,compRemainder16,count,residue16);  //for 5 and 16
 
-    always_comb begin  //get valid
-        pktOutAvail = (nextState==Wait)&&((currState!=Wait));
-        valid = pktOutAvail && (PID==~nPID) && ((
-                residue16==checkR16)||(PID[3:1]==3'b010));
+    assign pktOutAvail = (nextState==Wait)&&((currState!=Wait));
+    assign valid = (PID == ~nPID);
+/*    always_comb begin
+        if (isData) valid = (PID == ~nPID);
+        else        valid = (PID == ~nPID);
     end
-
+*/
     assign nPID = (pktOutAvail) ? pkt[3:0] : 0;
     assign PID = (pktOutAvail) ? pkt[7:4] : 0;
 
