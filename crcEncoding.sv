@@ -4,7 +4,7 @@ module encoding(
 	input logic [98:0] pkt,  //99 is max size
 	input bit pktInAvail,
 	output bit bOut,
-	output bit pkt_sent, re);
+	output bit pkt_sent);
 
 	enum logic [2:0] {Wait,CRC5Calc,TokenSend,CRC16Calc,
                       DataSend,HandShakeSend,Done} currState,nextState;
@@ -12,7 +12,6 @@ module encoding(
                       HandShake=2'b11} pktType,pktTypeSaved;
 
     assign pkt_sent = (currState==Done);
-    assign re = ~(currState == DataSend || currState == HandShakeSend || currState == TokenSend);
 
     logic [3:0] PID; //remember: reversed, so 1000 for out
     assign PID = pkt[90:87];

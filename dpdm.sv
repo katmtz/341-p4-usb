@@ -26,18 +26,19 @@ module dpdm (clk, rst_b,
     output logic r_bstr_ready;                // DPDM     ==> UNENCODING
     output bit r_bstr;                        // DPDM     ==> UNENCODING
 
-    input bit re;                             // PROTOCOL FSM ==> DPDM
+    output bit re;                             // PROTOCOL FSM ==> DPDM
     output bit done;                          // DPDM         ==> UNENCODING
     input logic [5:0] stuffed;
     logic r_ready;
 
     // writing
-    w_dpdm w (clk, rst_b, w_bstr, w_bstr_ready, dp_w, dm_w, stuffed);
+    w_dpdm w (clk, rst_b, w_bstr, w_bstr_ready, dp_w, dm_w, stuffed, sending);
 
     // reading
     r_dpdm r (clk, rst_b, r_bstr, r_ready, dp_r, dm_r, done);
 
-    assign r_bstr_ready = re && r_ready;      // only use bitstream if reading
+    assign r_bstr_ready = ~sending && r_ready;      // only use bitstream if reading
+    assign re = ~sending;
 
 endmodule: dpdm
 
@@ -81,7 +82,7 @@ module r_dpdm(clk, rst_b,
 	    7: pattern_break = ~J;
 	endcase
 
-    assign sync_detected = (sync_count == 3'd7);
+    assign sync_detected = (sync_count == 3'd6) && J;
 
     always_comb
         case (state)
@@ -108,12 +109,12 @@ endmodule: r_dpdm
  */
 module w_dpdm (clk, rst_b,
              bstr, bstr_ready,
-             dp, dm, stuffed);
+             dp, dm, stuffed, sending);
 
     input logic clk, rst_b;
     input bit bstr;
     input logic [1:0] bstr_ready;
-    output logic dp, dm;
+    output logic dp, dm, sending;
     input logic [5:0] stuffed;
 
     logic bstr_avail, use_stream, use_SEO, use_J;
@@ -122,12 +123,13 @@ module w_dpdm (clk, rst_b,
                       bstr_avail, bstr_ready, stuffed, 
                       use_stream, use_SEO, use_J);
 
+    assign sending = (use_stream || use_SEO || use_J);
+
     always_comb begin
-        if (~bstr_avail) begin
+        if (~sending) begin
             dp = 1'b1;
             dm = 1'b0;
-        end
-        else begin
+        end else begin
             if (use_stream) begin
                 dp = bstr;
                 dm = ~bstr;
@@ -154,6 +156,13 @@ module w_dpdm_ctrl (clk, rst_b,
     input logic [1:0] p_type;
     input logic [5:0] stuffed;
     output logic use_stream, use_SEO, use_J;
+
+    logic bstr_ready_r, bstr_avail;
+    always_ff @(posedge clk, negedge rst_b) begin
+        if (~rst_b) bstr_ready_r <= 0;
+        else        bstr_ready_r <= bstr_ready;
+    end
+    assign bstr_avail = bstr_ready || bstr_ready_r;
 
     // decide what counter's limit should be;
     logic [6:0] counter_lim;
@@ -183,7 +192,7 @@ module w_dpdm_ctrl (clk, rst_b,
 
     // use stream if we are in the packet data
     always_comb begin
-        if (bstr_ready) begin
+        if (bstr_avail) begin
             use_stream = (counter <= counter_lim) ? 1'b1 : 1'b0;
             use_SEO = (counter > counter_lim && counter <= (counter_lim + 2)) ? 1'b1 : 1'b0;
             use_J = (counter > (counter_lim + 2)) ? 1'b1 : 1'b0;
