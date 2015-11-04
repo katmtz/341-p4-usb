@@ -1,6 +1,8 @@
 // Handshake constants
-`define ACK 19'h014b
-`define NAK 19'h015a
+`define HS_ACK 19'h014b
+`define HS_NAK 19'h015a
+
+`define SYNC 8'b00000001
 
 // Transistion Status Constants
 `define TRANS_NON 2'b00
@@ -8,7 +10,7 @@
 `define TRANS_OUT 2'b10
 
 // Time Constants
-`define TIMEOUT 8'd255
+`define TIMEOUT_LEN 8'd255
 
 /*
  * protocol:
@@ -17,11 +19,11 @@
  * - passes data around according to control pts
  */
 module protocol(clk, rst_b,
-                transaction, data_in_avail,
+                transaction, data_from_rw_avail,
                 data_from_rw, token_from_rw,
-                data_to_rw, data_out_avail,
+                data_to_rw, data_to_rw_avail,
                 pkt_sent, pkt_succeeded,
-                enc_ready,
+                pkt_done, enc_ready,
                 pkt_to_enc, pkt_to_enc_avail,
                 pkt_from_dec, pkt_from_dec_avail,
                 pkt_from_dec_corrupt, re 
@@ -31,12 +33,12 @@ module protocol(clk, rst_b,
 
     // PROTOCOL <--> RW
     input [1:0] transaction;
-    input logic data_in_avail;
+    input logic data_from_rw_avail;
     input logic [18:0] token_from_rw;
     input logic [71:0] data_from_rw;
     output logic [63:0] data_to_rw;
-    output logic data_out_avail;
-    output logic pkt_sent, pkt_succeeded;
+    output logic data_to_rw_avail;
+    output logic pkt_done, pkt_sent, pkt_succeeded;
 
     // PROTOCOL --> ENCODING
     input logic enc_ready;
@@ -57,28 +59,29 @@ module protocol(clk, rst_b,
     logic do_out;
     assign do_out = (transaction == `TRANS_OUT);
 
-    logic [18:0] pkt_out;
-    logic recieved_nak, send_token;
-    logic in_done, in_success, send_hs, in_data_out_avail, in_re;
-    logic out_done, out_success, send_data,out_data_out_avail, out_re;
+    logic recieved_nak;
+    logic in_done, in_success, send_hs, in_data_to_enc_avail, in_re;
+    logic out_done, out_success, send_token,out_data_to_enc_avail, out_re;
 
-    in_ctrl  ic (clk, rst_b, do_in, data_in_avail,
+    in_ctrl  ic (clk, rst_b, do_in, data_from_rw_avail,
                  enc_ready, pkt_from_dec_avail, pkt_from_dec_corrupt,
-                 data_out_avail, in_done, in_success, send_hs, in_data_out_avail, in_re);
-    out_ctrl oc (clk, rst_b, do_out, data_in_avail,
+                 in_done, in_success, send_hs, in_data_to_enc_avail, in_re);
+    out_ctrl oc (clk, rst_b, do_out, data_from_rw_avail,
                  enc_ready, pkt_from_dec_avail, pkt_from_dec_corrupt,
-                 recieved_nak, out_done, out_success, out_data_out_avail, send_token, out_re);
+                 recieved_nak, out_done, out_success, out_data_to_enc_avail, send_token, out_re);
 
-    assign re = out_re || in_re;
-    assign pkt_succeeded = out_success || in_success;
-    assign pkt_sent = out_done || in_done;
-    assign pkt_to_enc_avail = out_data_out_avail || in_data_out_avail;
+    assign re = (do_out) ? out_re : in_re;
+    assign pkt_succeeded = (do_out) ? out_success : in_success;
+    assign pkt_sent = (do_out) ? out_done : in_done;
+    assign pkt_to_enc_avail = (do_out) ? out_data_to_enc_avail : in_data_to_enc_avail;
+    assign pkt_done = (do_out) ? out_done : in_done;
 
     // PKT MANAGEMENT
-    assign recieved_nak = (pkt_from_dec_avail) ? (pkt_from_dec[17:0] == `NAK) : 0;
+    assign recieved_nak = (pkt_from_dec_avail) ? (pkt_from_dec[17:0] == `HS_NAK) : 0;
     assign data_to_rw = pkt_from_dec[81:18];
 
-    assign pkt_from_rw = {data_from_rw, 26'b0}; 
+    logic [98:0] pkt_from_rw;
+    assign pkt_from_rw = {`SYNC, data_from_rw}; 
 
     always_comb begin
         case(transaction)
@@ -86,7 +89,7 @@ module protocol(clk, rst_b,
                 pkt_to_enc = 0;
             end
             `TRANS_IN: begin
-                pkt_to_enc = (~send_hs) ? token_from_rw : (pkt_succeeded) ? `ACK : `NAK;
+                pkt_to_enc = (~send_hs) ? token_from_rw : (pkt_succeeded) ? `HS_ACK : `HS_NAK;
             end
             `TRANS_OUT: begin
                 pkt_to_enc = (send_token) ? token_from_rw : pkt_from_rw;
@@ -103,17 +106,17 @@ endmodule: protocol
  * - if success, got an ack
  */
 module out_ctrl(clk, rst_b,
-                start, data_avail,
+                start, data_from_rw_avail,
                 enc_ready, pkt_from_dec_avail,
                 pkt_from_dec_corrupt,
                 recieved_nak,
-                done, success, data_out_avail, send_token, re);
+                done, success, data_to_enc_avail, send_token, re);
 
-    input logic clk, rst_b, start, data_avail,
+    input logic clk, rst_b, start, data_from_rw_avail,
                 enc_ready, pkt_from_dec_avail,
                 pkt_from_dec_corrupt,
                 recieved_nak;
-    output logic done, success, data_out_avail, send_token, re;
+    output logic done, success, data_to_enc_avail, send_token, re;
 
     logic pkt_sent, retry, timeout;
     logic data_recieved;
@@ -129,11 +132,16 @@ module out_ctrl(clk, rst_b,
 
     always_comb begin
         case(state)
-            idle: nextState = (start && data_avail) ? token : idle;
+            idle: nextState = (start && data_from_rw_avail) ? token : idle;
             token: nextState = (pkt_sent) ? data : token;
             data: nextState = (pkt_sent) ? hs : data;
             hs: nextState = (data_recieved) ? idle : (retry) ? data : idle;
         endcase
+    end
+
+    always_ff @(posedge clk, negedge rst_b) begin
+        if (~rst_b) state <= idle;
+        else        state <= nextState;
     end
 
     // TIMEOUT
@@ -165,7 +173,7 @@ module out_ctrl(clk, rst_b,
     assign done = (state == hs && nextState == idle);
     assign success = (done & data_recieved);
     assign send_token = (state == token);
-    assign data_out_avail = (state == token || state == data);
+    assign data_to_enc_avail = (state == token || state == data);
     assign re = (state == hs);
 
 endmodule: out_ctrl
@@ -182,15 +190,13 @@ module in_ctrl(clk, rst_b,
                data_avail, enc_ready,
                pkt_from_dec_avail,
                pkt_from_dec_corrupt,
-               data_out_avail,
                done, success, send_hs, data_to_enc_avail, re); 
 
     input logic clk, rst_b,
                 start, data_avail,
                 enc_ready,
                 pkt_from_dec_avail,
-                pkt_from_dec_corrupt,
-                data_out_avail;
+                pkt_from_dec_corrupt;
     output logic done, success, send_hs, data_to_enc_avail, re;
                 
     logic pkt_sent, retry, pkt_good, timeout;
@@ -272,5 +278,5 @@ module timeout(clk, rst_b,
         else        counter <= (rst) ? 0 : counter_in;
     end
 
-    assign timeout = (counter == `TIMEOUT);
+    assign timeout = (counter == `TIMEOUT_LEN);
 endmodule: timeout

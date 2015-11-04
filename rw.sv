@@ -20,24 +20,25 @@
 `define TASK_WRITE 2'b10
 
 module rw_fsm (clk, rst_b,
-               tsk, mempage, data_in, 
-               token_pkt_out, data_pkt_out,
-               data_to_tb, ptcl_data, pkt_sent,
-               data_avail, ptcl_done, 
-               ptcl_success, transaction,
-               task_done, task_success);
+               task, mempage, data,
+               tok_pkt_into_ptcl, data_pkt_into_ptcl,
+               data_into_ptcl_avail,
+               data_from_ptcl, data_from_ptcl_avail,
+               transaction, transaction_done, transaction_success,
+               data_to_tb, task_done, task_success);
 
     input logic clk, rst_b;
     input logic [1:0] tsk;
     input logic [15:0] mempage;
-    input logic [63:0] data_in;
-    input logic [63:0] ptcl_data;
-    input logic pkt_sent, ptcl_done, ptcl_success;
-    output logic [18:0] token_pkt_out;
-    output logic [71:0] data_pkt_out;
+    input logic [63:0] data;
+    input logic [63:0] data_from_ptcl;
+    input logic transaction_done, transaction_success;
+    output logic [18:0] token_pkt_into_ptcl;
+    output logic [71:0] data_pkt_into_ptcl;
     output logic [63:0] data_to_tb; 
     output logic [1:0] transaction;
-    output logic data_avail, task_done, task_success;
+    output logic data_into_ptcl_avail, data_from_ptcl_avail;
+    output logic task_done, task_success;
 
     logic [63:0] data_to_reverse, reversed_data, read_data;
     logic send_addr;
@@ -110,7 +111,7 @@ module transaction_ctrl (clk, rst_b,
                       success = 3'b011,
                       fail = 3'b100} state, nextState;
 
-    enum logic {in, out} transState;
+    enum logic {in = 1'b1, out = 1'b0} transState;
 
     always_comb
         case(state)
@@ -121,13 +122,6 @@ module transaction_ctrl (clk, rst_b,
             success: nextState = success;
         endcase
 
-    always_comb 
-        case(state)
-            addr: transaction = transState;
-            data: transaction = transState;
-            default: transaction = 0;
-        endcase 
-
     always_comb begin
         if (state == fail || state == success) begin
             task_done = 1'b1;
@@ -136,6 +130,14 @@ module transaction_ctrl (clk, rst_b,
             task_done = 1'b0;
             task_success = 1'b0;
         end
+    end
+
+    always_comb begin
+        transaction = 0;
+        if (transState == out)
+            transaction = 2'b10;
+        if (transState == in)
+            transaction = 2'b01;
     end
 
     always_ff @(posedge clk, negedge rst_b) begin
@@ -149,6 +151,6 @@ module transaction_ctrl (clk, rst_b,
     end
 
     assign send_addr = (state == addr);
-    assign data_avail = (state == addr || state == data);
+    assign data_avail = tsk != 0;
 
 endmodule: transaction_ctrl

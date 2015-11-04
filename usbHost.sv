@@ -31,12 +31,11 @@ module usbHost
       $display("Returning from task prelabRequest");
   endtask: prelabRequest
 
-  // read task wires
+  // TB <--> RW FSM
   logic [15:0] rw_mempage;
   logic [63:0] rw_data_to_tb, rw_data_in;
   logic [1:0] rw_task;
   logic rw_task_done, rw_task_success;
-
 
   task readData
   // host sends memPage to thumb drive and then gets data back from it
@@ -47,7 +46,7 @@ module usbHost
 
     $display("readData called with mempage: %0h and data: %0h", mempage, data);
     rst_bb <= 1'b0;
-    #5 rst_bb <= 1'b1;
+    #1 rst_bb <= 1'b1;
 
     // Hooking up task inputs to rw fsm
     rw_mempage <= mempage;
@@ -60,7 +59,7 @@ module usbHost
     @(posedge clk);
     #100;
     $display("Task success: %0b, returning.", success);
-    // return;
+      // return;
   endtask: readData
 
   task writeData
@@ -72,15 +71,16 @@ module usbHost
     
     $display("writeData called with mempage: %0h and data: %0h", mempage, data);
     rst_bb <= 1'b0;
-    #5 rst_bb <= 1'b1;
+    #1 rst_bb <= 1'b1;
     
     // Hooking up inputs
     rw_mempage <= mempage;
     rw_data_in <= data;
     rw_task <= `TASK_WRITE;
 
+    #1000
     // Let task finish
-    wait (rw_task_done);
+  //  wait (rw_task_done);
     success <= rw_task_success;
     @(posedge clk);
 
@@ -88,14 +88,15 @@ module usbHost
 
   endtask: writeData
 
-  // usbHost starts here!!
+  // BEGIN CONNECTIONS
 
-  // wires to be hooked up to to protocol fsm
+  // PROTOCOL FSM <--> DATAPATH
   logic [98:0] pkt_from_fsm, pkt_into_fsm;
-  logic pkt_from_fsm_avail, pkt_into_fsm_avail, data_good, decoder_ready, encoder_ready, re;
-  // end 
+  logic pkt_from_fsm_avail, pkt_into_fsm_avail, data_good, 
+        pkt_into_fsm_corrupt, decoder_ready, encoder_ready, re;
+  assign pkt_into_fsm_corrupt = ~data_good;
 
-  // tri-state assignment
+  // TRISTATE DRIVING
   logic dp_w, dm_w, dp_r, dm_r;
 
   assign wires.DP = (~re) ? dp_w : 1'bz;
@@ -103,40 +104,37 @@ module usbHost
   assign dp_r = wires.DP;
   assign dm_r = wires.DM;
 
-  logic nrzi_idle;
+  // RW FSM <--> PROTOCOL FSM
+  logic [63:0] data_from_ptcl;
+  logic [71:0] data_pkt_into_ptcl;
+  logic [18:0] tok_pkt_into_ptcl;
+  logic data_from_ptcl_avail, data_into_ptcl_avail;
+
+  logic [1:0] transaction;
+  logic transaction_done, transaction_success;
 
   datapath d (clk, rst_b,
               pkt_from_fsm, pkt_from_fsm_avail,
-              //prelab_pkt,prelab_pktInAvail,
-              pkt_into_fsm, pkt_into_fsm_avail, //protocol=fsm
+              pkt_into_fsm, pkt_into_fsm_avail,
               dp_w, dm_w, dp_r, dm_r,
               data_good, decoder_ready, encoder_ready, re);
 
-  // Protocol/RW wires
-  logic [18:0] token_pkt_in;
-  logic [71:0] data_pkt_in;
-  logic [63:0] ptcl_data;
-  logic ptcl_done, ptcl_success, ptcl_read;
-  logic pkt_into_fsm_corrupt;
-  assign pkt_into_fsm_corrupt = ~data_good;
-  logic [1:0] transaction;
-
   protocol p (clk, rst_b,
-              transaction, data_avail,
-              data_pkt_in, token_pkt_in,
-              ptcl_data, ptcl_data_avail,
-              ptcl_sent, pctl_success,
-              encoder_ready,
+              transaction, data_pkt_into_ptcl_avail,
+              data_pkt_into_ptcl, tok_pkt_into_ptcl,
+              data_from_ptcl, data_from_ptcl_avail,
+              transaction_done, transaction_success,
+              encoder_ready, decoder_ready,
               pkt_from_fsm, pkt_from_fsm_avail,
               pkt_into_fsm, pkt_into_fsm_avail,
               pkt_into_fsm_corrupt, re);
             
   rw_fsm rw (clk, rst_b,
              rw_task, rw_mempage, rw_data_in,
-             token_pkt_in, data_pkt_in,
-             rw_data_to_tb, ptcl_data, ptcl_sent,
-             data_avail, ptcl_done,
-             ptcl_success, transaction,
-             rw_task_done, rw_task_success);
+             tok_pkt_into_ptcl, data_pkt_into_ptcl,
+             data_into_ptcl_avail,
+             data_from_ptcl, data_from_ptcl_avail,
+             transaction, transaction_done, transaction_success,
+             rw_data_to_tb, rw_task_done, rw_task_success);
 
 endmodule: usbHost
