@@ -67,7 +67,6 @@ module crc5(clk, rst_b, en,
     output logic crc_val_avail;
 
     reg [4:0] lfsr_c, lfsr_q;
-    assign crc_val = lfsr_q;
 
     always_comb begin
         lfsr_c[0] = (en) ? lfsr_q[4] ^ bstr_in             : lfsr_q[0];
@@ -82,6 +81,12 @@ module crc5(clk, rst_b, en,
         else        lfsr_q <= lfsr_c;
     end
 
+    logic [4:0] crc_last;
+    always_ff @(posedge clk, negedge rst_b) begin
+        if (~rst_b) crc_last <= 0;
+        else        crc_last <= lfsr_q;
+    end
+
     logic bstr_last_avail;
     always_ff @(posedge clk, negedge rst_b) begin
         if (~rst_b) bstr_last_avail <= 0;
@@ -89,6 +94,7 @@ module crc5(clk, rst_b, en,
     end
 
     assign crc_val_avail = (bstr_last_avail && ~bstr_in_avail);
+    assign crc_val = crc_last;
 
 endmodule: crc5
 

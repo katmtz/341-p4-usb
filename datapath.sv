@@ -1,5 +1,5 @@
 // MODULE FILES
-`include "crcEncoding.sv"
+`include "encoding.sv"
 `include "crcDecoding.sv"
 `include "stuffer.sv"
 `include "nrzi.sv"

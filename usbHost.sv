@@ -54,7 +54,8 @@ module usbHost
     rw_task <= `TASK_READ;
 
     // Let task finish
-    wait (rw_task_done);
+    #1000
+//    wait (rw_task_done);
     success <= rw_task_success;
     data <= rw_data_to_tb;
     @(posedge clk);
@@ -78,7 +79,7 @@ module usbHost
     rw_data_in <= data;
     rw_task <= `TASK_WRITE;
 
-    // Let task finish
+    // Let task finish/
     wait (rw_task_done);
     success <= rw_task_success;
     @(posedge clk);

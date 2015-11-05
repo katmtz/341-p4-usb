@@ -56,11 +56,12 @@ module protocol(clk, rst_b,
 
     assign pkt_succeeded = (do_out) ? out_success : in_success;
     assign pkt_done = (do_out) ? out_done : in_done;
-    assign pkt_to_enc_avail = (do_out) ? out_data_to_enc_avail : in_data_to_enc_avail;
+    assign pkt_to_enc_avail = (do_out) ? out_data_to_enc_avail && ~pkt_sent : in_data_to_enc_avail && ~pkt_sent;
 
     // PKT MANAGEMENT
     assign recieved_nak = (pkt_from_dec_avail) ? (pkt_from_dec[17:0] == `HS_NAK) : 0;
     assign data_to_rw = pkt_from_dec[81:18];
+    assign data_to_rw_avail = pkt_from_dec_avail;
 
     logic [98:0] pkt_from_rw;
     assign pkt_from_rw = {`SYNC, data_from_rw, 19'b0}; 
