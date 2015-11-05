@@ -37,7 +37,7 @@ module datapath (clk, rst_b,
     logic [1:0] crc2stuffer_ready, stuffer2nrzi_ready, nrzi2dpdm_ready;
     logic [5:0] stuffed_in, stuffed_out;
 
-    encoding    encoder (clk, rst_b, crc2stuffer_ready, pkt_in, pkt_in_avail, crc2stuffer_str, encoder_ready);
+    encoding    encoder (clk, rst_b, pkt_in, pkt_in_avail, crc2stuffer_str, crc2stuffer_ready, encoder_ready);
     bitstuffing stuffer (clk, rst_b, crc2stuffer_str, crc2stuffer_ready, stuffer2nrzi_str, stuffer2nrzi_ready,stuffed_in);
     nrzi        nrzier  (clk, rst_b, stuffer2nrzi_str, stuffer2nrzi_ready, nrzi2dpdm_str, nrzi2dpdm_ready,stuffed_in, stuffed_out);
 

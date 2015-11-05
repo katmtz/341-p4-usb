@@ -1,8 +1,3 @@
-// Constants for packet sizes - info bytes + sync
-`define TOK_S 7'd32
-`define HANDSHAKE_S 7'd16
-`define DATA_S 7'd96
-
 module nrzi(clk, rst_b, 
             bstr_in, bstr_in_ready,
             bstr_out, bstr_out_ready,

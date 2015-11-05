@@ -1,17 +1,3 @@
-// Handshake constants
-`define HS_ACK 19'h014b
-`define HS_NAK 19'h015a
-
-`define SYNC 8'b00000001
-
-// Transistion Status Constants
-`define TRANS_NON 2'b00
-`define TRANS_IN  2'b01
-`define TRANS_OUT 2'b10
-
-// Time Constants
-`define TIMEOUT_LEN 8'd255
-
 /*
  * protocol:
  * - gets transaction type from rw, 

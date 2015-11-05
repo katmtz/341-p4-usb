@@ -30,7 +30,7 @@ module decoding(
     logic [6:0] sipoMax;
     assign sipoMax = (isToken) ? 7'd35 : (isData ? 7'd99 : 7'd19); //'
     assign sipoRst = ~rst_b||((nextState==Wait)&&(currState==Wait));
-    SIPO_reg sipo(pkt,bitIn,sipoDone,sipoMax,clk,bitInAvail,sipoRst);
+    SIPO sipo(pkt,bitIn,sipoDone,sipoMax,clk,bitInAvail,sipoRst);
 
     //get residues!
     logic [15:0] compRemainder5;
@@ -165,35 +165,6 @@ module calcR5(
 
 
 endmodule: calcR5
-
-
-module SIPO_reg  //max count 
-	(output logic [98:0] d,
-	input bit inBit,
-	output logic done,
-    input logic [6:0] max,
-	input logic clock,
-	input logic en,
-	input logic rst);
-
-	logic [98:0] q;
-	logic [6:0] count;
-
-	assign d = q;
-	assign done = (count==max); 
-	
-	always_ff @(posedge clock, posedge rst)
-	  if (rst) begin
-	    q <= 0;
-	    count <= 0;
-	    end
-	  else if (en) begin
-	    q <= (q << 1) | inBit;
-	    count <= (count==99) ? 0 : (count+1);
-	    end
-
-endmodule: SIPO_reg
-
 
 module maxCounter2( //up to max, different than maxCounter in encoder
 	input logic en, clr, clk,

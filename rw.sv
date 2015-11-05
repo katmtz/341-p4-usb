@@ -3,22 +3,6 @@
  * - manages transactions for the protocol fsm & interacts with 
  * the testbench
  */
-// Includes
-`include "reverser.sv"
-
-// Packet Data Constants
-`define OUTPID 8'b10000111
-`define INPID 8'b10010110
-`define DATAPID 8'b11000011
-`define ADDR 7'b1010000
-`define ENDP4 4'b0010
-`define ENDP8 4'b0001
-
-// Task Type Constants
-`define TASK_IDLE 2'b0
-`define TASK_READ 2'b01
-`define TASK_WRITE 2'b10
-
 module rw_fsm (clk, rst_b,
                tsk, mempage, data_from_tb,
                tok_pkt_into_ptcl, data_pkt_into_ptcl,

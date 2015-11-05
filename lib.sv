@@ -4,10 +4,12 @@
 
 // Constants
 
-// PIDs
+// PIDs for RW
 `define OUTPID 8'b10000111
 `define INPID 8'b10010110
 `define DATAPID 8'b11000011
+`define ACKPID 8'b01001011
+`define NAKPID 8'b01011010
 
 // Addresses and endpoints
 `define ADDR 7'b1010000
@@ -23,6 +25,12 @@
 `define TRANS_NON 2'b00
 `define TRANS_IN  2'b01
 `define TRANS_OUT 2'b10
+
+// Packet types
+`define TYPE_TOK 2'b01
+`define TYPE_DATA 2'b10
+`define TYPE_HS 2'b11
+`define TYPE_NON 2'b00
 
 // Packet sizes
 `define TOK_S 7'd32
@@ -53,15 +61,20 @@ module crc5(clk, rst_b, en,
             bstr_in, bstr_in_avail,
             crc_val, crc_val_avail);
 
+    input logic clk, rst_b, en;
+    input logic bstr_in, bstr_in_avail;
+    output logic [4:0] crc_val;
+    output logic crc_val_avail;
+
     reg [4:0] lfsr_c, lfsr_q;
     assign crc_val = lfsr_q;
 
     always_comb begin
-        lfsr_c[0] = (en) ? lfsr_q[4] ^ bstr_in           : lfsr_q[0];
-        lfsr_c[1] = (en) ? lfsr_q[0]                     : lfsr_q[1];
-        lfsr_c[2] = (en) ? lfsr_q[1] ^ lfsr[4] ^ bstr_in : lfsr_q[2];
-        lfsr_c[3] = (en) ? lfsr_q[2]                     : lfsr_q[3];
-        lfsr_c[4] = (en) ? lfsr_q[3]                     : lfsr[4];
+        lfsr_c[0] = (en) ? lfsr_q[4] ^ bstr_in             : lfsr_q[0];
+        lfsr_c[1] = (en) ? lfsr_q[0]                       : lfsr_q[1];
+        lfsr_c[2] = (en) ? lfsr_q[1] ^ lfsr_q[4] ^ bstr_in : lfsr_q[2];
+        lfsr_c[3] = (en) ? lfsr_q[2]                       : lfsr_q[3];
+        lfsr_c[4] = (en) ? lfsr_q[3]                       : lfsr_q[4];
     end 
 
     always_ff @(posedge clk, negedge rst_b) begin
@@ -72,10 +85,10 @@ module crc5(clk, rst_b, en,
     logic bstr_last_avail;
     always_ff @(posedge clk, negedge rst_b) begin
         if (~rst_b) bstr_last_avail <= 0;
-        else        bstr_last_avail <= bstr_avail;
+        else        bstr_last_avail <= bstr_in_avail;
     end
 
-    assign crc_val_avail = (bstr_last_avail && ~bstr_avail);
+    assign crc_val_avail = (bstr_last_avail && ~bstr_in_avail);
 
 endmodule: crc5
 
@@ -83,7 +96,10 @@ module crc16 (clk, rst_b, en,
               bstr_in, bstr_avail,
               crc_val, crc_val_avail);
 
-    
+    input logic clk, rst_b, en;
+    input logic bstr_in, bstr_avail;
+    output logic [4:0] crc_val;
+    output logic crc_val_avail; 
 
     logic bstr_last_avail;
     always_ff @(posedge clk, negedge rst_b) begin
@@ -233,3 +249,17 @@ module revCounter( //actually counts normally wow
         else if (en)
           index <= (index!=0) ? index - 1 : 0; //dont wanna be goin negative
 endmodule: revCounter
+
+module ff(  //initiated to ONE
+    input bit clk, rst,
+    input bit in,
+    output bit out);
+
+    always_ff @(posedge clk, posedge rst)
+        if(rst)
+            out <= 1;
+        else
+            out <= in;
+
+endmodule: ff
+

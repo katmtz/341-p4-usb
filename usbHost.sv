@@ -1,4 +1,5 @@
 // module includes
+`include "lib.sv"
 `include "datapath.sv"
 `include "protocol.sv"
 `include "rw.sv"
