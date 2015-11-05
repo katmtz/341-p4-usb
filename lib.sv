@@ -36,7 +36,64 @@
 // Sync
 `define SYNC 8'b00000001
 
+// Timeout
+`define TIMEOUT_LEN 8'd255
+
 // Useful Modules
+
+/*
+ * Modules defined:
+ * - crc5,16 calculation, with enables
+ * - packet to serial (from suzz)
+ * - serial to packet (from suzz)
+ * - reverse counter for packet to serial (from suzz)
+ */
+
+module crc5(clk, rst_b, en,
+            bstr_in, bstr_in_avail,
+            crc_val, crc_val_avail);
+
+    reg [4:0] lfsr_c, lfsr_q;
+    assign crc_val = lfsr_q;
+
+    always_comb begin
+        lfsr_c[0] = (en) ? lfsr_q[4] ^ bstr_in           : lfsr_q[0];
+        lfsr_c[1] = (en) ? lfsr_q[0]                     : lfsr_q[1];
+        lfsr_c[2] = (en) ? lfsr_q[1] ^ lfsr[4] ^ bstr_in : lfsr_q[2];
+        lfsr_c[3] = (en) ? lfsr_q[2]                     : lfsr_q[3];
+        lfsr_c[4] = (en) ? lfsr_q[3]                     : lfsr[4];
+    end 
+
+    always_ff @(posedge clk, negedge rst_b) begin
+        if (~rst_b) lfsr_q <= 5'h1f;
+        else        lfsr_q <= lfsr_c;
+    end
+
+    logic bstr_last_avail;
+    always_ff @(posedge clk, negedge rst_b) begin
+        if (~rst_b) bstr_last_avail <= 0;
+        else        bstr_last_avail <= bstr_avail;
+    end
+
+    assign crc_val_avail = (bstr_last_avail && ~bstr_avail);
+
+endmodule: crc5
+
+module crc16 (clk, rst_b, en,
+              bstr_in, bstr_avail,
+              crc_val, crc_val_avail);
+
+    
+
+    logic bstr_last_avail;
+    always_ff @(posedge clk, negedge rst_b) begin
+        if (~rst_b) bstr_last_avail <= 0;
+        else        bstr_last_avail <= bstr_avail;
+    end
+
+    assign crc_val_avail = (bstr_last_avail && ~bstr_avail);
+
+endmodule: crc16 
 
 /*
  * Combinationally reverse a 64b data chunk
