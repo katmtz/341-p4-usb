@@ -121,14 +121,13 @@ module enc_crc5 (clk, rst_b,
     input logic bstr_in, en, read;
     output logic crc_out;
 
-    // ignore sync
-    logic [6:0] sync_count;
+    logic [6:0] init_count;
     always_ff @(posedge clk, negedge rst_b) begin
-        if (~rst_b) sync_count <= 0;
-        else        sync_count <= (en) ? sync_count + 1 : 0;
+        if (~rst_b) init_count <= 0;
+        else        init_count <= (en) ? init_count + 1 : 0;
     end
     logic crc_str_avail;
-    assign crc_str_avail = en && (sync_count > 7);
+    assign crc_str_avail = en && (init_count > 15);
 
     logic [4:0] crc_val;
     logic crc_avail;
@@ -148,8 +147,8 @@ module enc_crc5 (clk, rst_b,
 
     always_comb
         case(counter)
-            0: crc_out = (read) ? crc_val[0] : 0;
-            default: crc_out = (read) ? crc_saved[counter] : 0;
+            0: crc_out = (read) ? ~crc_val[0] : 0;
+            default: crc_out = (read) ? ~crc_saved[counter] : 0;
         endcase
 
 endmodule: enc_crc5
@@ -162,13 +161,14 @@ module enc_crc16 (clk, rst_b,
     input logic bstr_in, en, read;
     output logic crc_out;
 
-    logic [6:0] sync_count;
+    logic [6:0] init_count;
     always_ff @(posedge clk, negedge rst_b) begin
-        if (~rst_b) sync_count <= 0;
-        else        sync_count <= (en) ? sync_count + 1 : 0;
+        if (~rst_b) init_count <= 0;
+        else        init_count <= (en) ? init_count + 1 : 0;
     end
     logic crc_str_avail;
-    assign crc_str_avail = en && (sync_count > 7);
+    assign crc_str_avail = en && (init_count > 15);
+
 
     logic [15:0] crc_val;
     logic crc_avail;
@@ -183,13 +183,13 @@ module enc_crc16 (clk, rst_b,
 
     always_ff @(posedge clk, negedge rst_b) begin
         if (~rst_b) counter <= 0;
-        else        counter <= (en) ? counter + 1 : 0;
+        else        counter <= (read) ? counter + 1 : 0;
     end
 
     always_comb
         case(counter)
-            0: crc_out = (read) ? crc_val[0] : 0;
-            default: crc_out = (read) ? crc_saved : 0;
+            0: crc_out = (read) ? ~crc_val[15] : 0;
+            default: crc_out = (read) ? ~crc_saved[15 - counter] : 0;
         endcase
 
 endmodule: enc_crc16

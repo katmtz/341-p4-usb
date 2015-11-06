@@ -78,7 +78,7 @@ module crc5(clk, rst_b, en,
 
     always_ff @(posedge clk, negedge rst_b) begin
         if (~rst_b) lfsr_q <= 5'h1f;
-        else        lfsr_q <= lfsr_c;
+        else        lfsr_q <= (en) ? lfsr_c : 5'h1f;
     end
 
     logic [4:0] crc_last;
@@ -136,17 +136,11 @@ module crc16 (clk, rst_b, en,
 
     always_ff @(posedge clk, negedge rst_b) begin
         if (~rst_b) lfsr_q <= 16'hffff;
-        else        lfsr_q <= lfsr_c;
-    end
-
-    logic [15:0] crc_last;
-    always_ff @(posedge clk, negedge rst_b) begin
-        if (~rst_b) crc_last <= 0;
-        else        crc_last <= lfsr_q;
+        else        lfsr_q <= (en) ? lfsr_c : 16'hffff;
     end
 
     assign crc_val_avail = (bstr_last_avail && ~bstr_avail);
-    assign crc_val = crc_last;
+    assign crc_val = lfsr_q;
 
 endmodule: crc16 
 

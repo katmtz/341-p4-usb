@@ -59,14 +59,8 @@ module protocol(clk, rst_b,
     assign pkt_to_enc_avail = (do_out) ? out_data_to_enc_avail : in_data_to_enc_avail;
 
     // PKT MANAGEMENT
-    logic [7:0] pkt_from_dec_pid_saved;
-    always_ff @(posedge clk, negedge rst_b) begin
-        if (~rst_b) pkt_from_dec_pid_saved <= 0;
-        else        pkt_from_dec_pid_saved <= pkt_from_dec[7:0];
-    end
-
-    assign got_nak = (pkt_from_dec_avail) ? (pkt_from_dec_pid_saved != `HS_ACK) : 0;
-    assign got_ack = (pkt_from_dec_avail) ? (pkt_from_dec_pid_saved == `HS_ACK) : 0;
+    assign got_nak = (pkt_from_dec_avail) ? (pkt_from_dec[7:0] != 8'h4b) : 0;
+    assign got_ack = (pkt_from_dec_avail) ? (pkt_from_dec[7:0] == 8'h4b) : 0;
     assign data_to_rw = pkt_from_dec[81:18];
     assign data_to_rw_avail = pkt_from_dec_avail;
 
