@@ -104,7 +104,7 @@ module crc16 (clk, rst_b, en,
 
     input logic clk, rst_b, en;
     input logic bstr_in, bstr_avail;
-    output logic [4:0] crc_val;
+    output logic [15:0] crc_val;
     output logic crc_val_avail; 
 
     logic bstr_last_avail;
@@ -113,7 +113,40 @@ module crc16 (clk, rst_b, en,
         else        bstr_last_avail <= bstr_avail;
     end
 
+    reg [15:0] lfsr_c, lfsr_q;
+
+    always_comb begin
+        lfsr_c[0]  = (en) ? bstr_in ^ lfsr_q[15]              : lfsr_q[0];
+        lfsr_c[1]  = (en) ? lfsr_q[0]                         : lfsr_q[1];
+        lfsr_c[2]  = (en) ? lfsr_q[1] ^ lfsr_q[15] ^ bstr_in  : lfsr_q[2];
+        lfsr_c[3]  = (en) ? lfsr_q[2]                         : lfsr_q[3];
+        lfsr_c[4]  = (en) ? lfsr_q[3]                         : lfsr_q[4];
+        lfsr_c[5]  = (en) ? lfsr_q[4]                         : lfsr_q[5];
+        lfsr_c[6]  = (en) ? lfsr_q[5]                         : lfsr_q[6];
+        lfsr_c[7]  = (en) ? lfsr_q[6]                         : lfsr_q[7];
+        lfsr_c[8]  = (en) ? lfsr_q[7]                         : lfsr_q[8];
+        lfsr_c[9]  = (en) ? lfsr_q[8]                         : lfsr_q[9];
+        lfsr_c[10] = (en) ? lfsr_q[9]                         : lfsr_q[10];
+        lfsr_c[11] = (en) ? lfsr_q[10]                        : lfsr_q[11];
+        lfsr_c[12] = (en) ? lfsr_q[11]                        : lfsr_q[12];
+        lfsr_c[13] = (en) ? lfsr_q[12]                        : lfsr_q[13];
+        lfsr_c[14] = (en) ? lfsr_q[13]                        : lfsr_q[14];
+        lfsr_c[15] = (en) ? lfsr_q[14] ^ lfsr_q[15] ^ bstr_in : lfsr_q[15];
+    end
+
+    always_ff @(posedge clk, negedge rst_b) begin
+        if (~rst_b) lfsr_q <= 16'hffff;
+        else        lfsr_q <= lfsr_c;
+    end
+
+    logic [15:0] crc_last;
+    always_ff @(posedge clk, negedge rst_b) begin
+        if (~rst_b) crc_last <= 0;
+        else        crc_last <= lfsr_q;
+    end
+
     assign crc_val_avail = (bstr_last_avail && ~bstr_avail);
+    assign crc_val = crc_last;
 
 endmodule: crc16 
 

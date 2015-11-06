@@ -164,10 +164,10 @@ module w_dpdm_ctrl (clk, rst_b,
     logic [6:0] counter_lim;
     always_comb
         case(p_type)
-            2'b0: counter_lim = 7'b0;
-            2'b01: counter_lim = `TOK_S + stuffed;
-            2'b10: counter_lim = `DATA_S + stuffed;
-            2'b11: counter_lim = `HANDSHAKE_S + stuffed;
+            `TYPE_NON: counter_lim = 7'b0;
+            `TYPE_TOK: counter_lim = `TOK_S + stuffed;
+            `TYPE_DATA: counter_lim = `DATA_S + stuffed;
+            `TYPE_HS: counter_lim = `HANDSHAKE_S + stuffed;
         endcase
 
     // increment counter if there's data

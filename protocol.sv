@@ -56,7 +56,7 @@ module protocol(clk, rst_b,
 
     assign pkt_succeeded = (do_out) ? out_success : in_success;
     assign pkt_done = (do_out) ? out_done : in_done;
-    assign pkt_to_enc_avail = (do_out) ? out_data_to_enc_avail && ~pkt_sent : in_data_to_enc_avail && ~pkt_sent;
+    assign pkt_to_enc_avail = (do_out) ? out_data_to_enc_avail : in_data_to_enc_avail;
 
     // PKT MANAGEMENT
     assign recieved_nak = (pkt_from_dec_avail) ? (pkt_from_dec[17:0] == `HS_NAK) : 0;
@@ -105,7 +105,7 @@ module out_ctrl(clk, rst_b,
     logic data_recieved;
     logic [7:0] counter;
 
-    assign data_recieved = ~recieved_nak && ~pkt_from_dec_corrupt && ~timeout;
+    assign data_recieved = pkt_from_dec_avail && ~recieved_nak && ~pkt_from_dec_corrupt && ~timeout;
 
     // STATE TRANSISTIONS
     enum logic [1:0] {idle = 2'b00,
@@ -122,7 +122,7 @@ module out_ctrl(clk, rst_b,
         endcase
     end
 
-    // TODO: hs advances too quickly; read enable needs to be high when not data send or token send 
+    // TODO: hs advances too quickly 
 
     always_ff @(posedge clk, negedge rst_b) begin
         if (~rst_b) state <= idle;
@@ -149,7 +149,7 @@ module out_ctrl(clk, rst_b,
     assign done = (state == hs && nextState == idle);
     assign success = (done & data_recieved);
     assign send_token = (state == token);
-    assign data_to_enc_avail = (state == token || state == data);
+    assign data_to_enc_avail = (state == token) || (state == data);
 
 endmodule: out_ctrl
 
