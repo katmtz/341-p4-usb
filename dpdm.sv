@@ -92,9 +92,15 @@ module r_dpdm(clk, rst_b,
         else state <= nextState;
     end
 
+    logic last;
+    always_ff @(posedge clk, negedge rst_b) begin
+        if (~rst_b) last <= 0;
+        else        last <= (state == eop && nextState == seek);
+    end
+
     assign bstr = dp;
-    assign bstr_ready = (state == en && ~eop_detected);
-    assign done = (state == eop && nextState == seek);
+    assign bstr_ready = sync_detected || (state == en && ~eop_detected);
+    assign done = last;
 
 endmodule: r_dpdm
 
