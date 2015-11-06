@@ -31,7 +31,7 @@ module decoding(
     logic sipoDone,sipoRst;
     logic [6:0] sipoMax;
     assign sipoMax = (isToken) ? 7'd35 : (isData ? 7'd99 : 7'd19); //'
-    assign sipoRst = ~rst_b || (currState==Wait);
+    assign sipoRst = ~rst_b || (currState==Wait && nextState != Collect);
     SIPO sipo(pkt,bitIn,sipoDone,sipoMax,clk,bitInAvail,sipoRst);
 
     //get residues!
