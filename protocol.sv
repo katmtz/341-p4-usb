@@ -43,7 +43,7 @@ module protocol(clk, rst_b,
     logic do_out;
     assign do_out = (transaction == `TRANS_OUT);
 
-    logic recieved_nak;
+    logic got_ack, got_nak;
     logic in_done, in_success, send_hs, in_data_to_enc_avail;
     logic out_done, out_success, send_token,out_data_to_enc_avail;
 
@@ -52,14 +52,21 @@ module protocol(clk, rst_b,
                  in_done, in_success, send_hs, in_data_to_enc_avail);
     out_ctrl oc (clk, rst_b, do_out, data_from_rw_avail,
                  pkt_sent, pkt_from_dec_avail, pkt_from_dec_corrupt,
-                 recieved_nak, out_done, out_success, out_data_to_enc_avail, send_token);
+                 got_nak, got_ack, out_done, out_success, out_data_to_enc_avail, send_token);
 
     assign pkt_succeeded = (do_out) ? out_success : in_success;
     assign pkt_done = (do_out) ? out_done : in_done;
     assign pkt_to_enc_avail = (do_out) ? out_data_to_enc_avail : in_data_to_enc_avail;
 
     // PKT MANAGEMENT
-    assign recieved_nak = (pkt_from_dec_avail) ? (pkt_from_dec[17:0] == `HS_NAK) : 0;
+    logic [7:0] pkt_from_dec_pid_saved;
+    always_ff @(posedge clk, negedge rst_b) begin
+        if (~rst_b) pkt_from_dec_pid_saved <= 0;
+        else        pkt_from_dec_pid_saved <= pkt_from_dec[7:0];
+    end
+
+    assign got_nak = (pkt_from_dec_avail) ? (pkt_from_dec_pid_saved != `HS_ACK) : 0;
+    assign got_ack = (pkt_from_dec_avail) ? (pkt_from_dec_pid_saved == `HS_ACK) : 0;
     assign data_to_rw = pkt_from_dec[81:18];
     assign data_to_rw_avail = pkt_from_dec_avail;
 
@@ -92,33 +99,42 @@ module out_ctrl(clk, rst_b,
                 start, data_from_rw_avail,
                 pkt_sent, pkt_from_dec_avail,
                 pkt_from_dec_corrupt,
-                recieved_nak,
+                got_nak, got_ack,
                 done, success, data_to_enc_avail, send_token);
 
     input logic clk, rst_b, start, data_from_rw_avail,
                 pkt_from_dec_avail, pkt_sent,
                 pkt_from_dec_corrupt,
-                recieved_nak;
+                got_nak, got_ack;
     output logic done, success, data_to_enc_avail, send_token;
 
     logic retry, timeout;
-    logic data_recieved;
+    logic data_accepted;
     logic [7:0] counter;
 
-    assign data_recieved = pkt_from_dec_avail && ~recieved_nak && ~pkt_from_dec_corrupt && ~timeout;
+    assign data_accepted = pkt_from_dec_avail && ~pkt_from_dec_corrupt && got_ack;
 
     // STATE TRANSISTIONS
-    enum logic [1:0] {idle = 2'b00,
-                      token = 2'b01,
-                      data = 2'b10,
-                      hs = 2'b11} state, nextState;
+    enum logic [2:0] {idle = 3'b000,
+                      token = 3'b001,
+                      data = 3'b010,
+                      hs = 3'b011,
+                      hold = 3'b100} state, nextState;
 
     always_comb begin
         case(state)
             idle: nextState = (start && data_from_rw_avail) ? token : idle;
-            token: nextState = (pkt_sent) ? data : token;
+            token: nextState = (pkt_sent) ? hold : token;
+            hold: nextState = data;
             data: nextState = (pkt_sent) ? hs : data;
-            hs: nextState = (data_recieved) ? idle : (retry) ? data : idle;
+            hs: begin
+                if (got_ack)
+                    nextState = idle;
+                if (timeout || got_nak)
+                     nextState = (retry) ? data : idle;
+                if (~timeout && ~pkt_from_dec_avail)
+                    nextState = hs;
+            end
         endcase
     end
 
@@ -131,14 +147,14 @@ module out_ctrl(clk, rst_b,
 
     // TIMEOUT
     logic en, rst;
-    assign en = (state == idle || state == hs);
+    assign en = (state == hs);
     assign rst = ~en;
     timeout to (clk, rst_b, en, rst, timeout);
 
     // STATUS POINTS
 
     // retry: try to send packet again?
-    assign retry = (state == hs && ~data_recieved && counter < 7);
+    assign retry = (timeout || got_nak) && (counter < 7);
 
     // counter: track number of naks recieved
     always_ff @(posedge clk, negedge rst_b) begin
@@ -147,7 +163,7 @@ module out_ctrl(clk, rst_b,
     end
 
     assign done = (state == hs && nextState == idle);
-    assign success = (done & data_recieved);
+    assign success = (done & data_accepted);
     assign send_token = (state == token);
     assign data_to_enc_avail = (state == token) || (state == data);
 
