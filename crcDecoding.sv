@@ -14,14 +14,16 @@ module decoding(
 
     bit isToken,isData;
     logic [3:0] PID, nPID;
+    logic [7:0] pid;
+    assign pid = { nPID, PID };
 
-    assign isToken = (PID[3:1] == 3'b100);
-    assign isData = (PID[3:0] == 4'b1100);
+    assign isToken = (pid == `OUTPID || pid == `INPID);
+    assign isData = (pid == `DATAPID);
 
     logic [6:0] count, max, index; //controls nextState and index of pkt
-    assign index = (count>=max) ? 0 : count; 
+    assign index = (count >= max) ? 0 : count; 
     logic counterEn,counterClr; //assigned based on state
-    assign counterEn = bitInAvail || ((currState != Wait)&&(currState != Collect));
+    assign counterEn = bitInAvail || (currState == CRC5 || currState == CRC16);
     assign counterClr = (currState == Wait);
     maxCounter2 mC(counterEn,counterClr,clk,max,count);
 
@@ -29,7 +31,7 @@ module decoding(
     logic sipoDone,sipoRst;
     logic [6:0] sipoMax;
     assign sipoMax = (isToken) ? 7'd35 : (isData ? 7'd99 : 7'd19); //'
-    assign sipoRst = ~rst_b||((nextState==Wait)&&(currState==Wait));
+    assign sipoRst = ~rst_b || (currState==Wait);
     SIPO sipo(pkt,bitIn,sipoDone,sipoMax,clk,bitInAvail,sipoRst);
 
     //get residues!
@@ -43,23 +45,19 @@ module decoding(
     assign compRemainder16 = pkt[80:1];
 
     logic c5rst, c16rst; //assigned based on state
-    assign c5rst = (nextState != CRC5)&&(currState != CRC5);
-    assign c16rst = (nextState != CRC16)&&(currState != CRC16);
+    assign c5rst = (currState == Wait);
+    assign c16rst = (currState == Wait);
     calcR5 ffer5(clk,c5rst,compRemainder5,count,residue5);  //all the flipflop logic
     calcR16 ffer16(clk,c16rst,compRemainder16,count,residue16);  //for 5 and 16
 
+    logic [3:0] npid, pid;
     assign pktOutAvail = (nextState==Wait)&&((currState!=Wait));
-    assign valid = (PID == ~nPID);
-/*    always_comb begin
-        if (isData) valid = (PID == ~nPID);
-        else        valid = (PID == ~nPID);
-    end
-*/
+    assign valid = (isToken || isData);
+    
     assign nPID = (pktOutAvail) ? pkt[3:0] : 0;
     assign PID = (pktOutAvail) ? pkt[7:4] : 0;
 
     always_comb begin //nextstate logic and max of counter
-        max = 7'd0; //default value: doesn't matter, not counting
         case (currState)
             Wait:
                 nextState = bitInAvail ? Collect : Wait;

@@ -75,7 +75,6 @@ module enc_ctrl(clk, rst_b, pkt_avail, pkt_type,
             default: crc_size = 5'd0;
         endcase
 
-    logic use_crc;
     always_comb begin
         use_eop = 0; use_stream = 0; use_crc = 0;
         if (counter < counter_lim) begin    
@@ -147,8 +146,8 @@ module enc_crc5 (clk, rst_b,
 
     always_comb
         case(counter)
-            0: crc_out = (read) ? ~crc_val[0] : 0;
-            default: crc_out = (read) ? ~crc_saved[counter] : 0;
+            0: crc_out = (read) ? ~crc_val[4] : 0;
+            default: crc_out = (read) ? ~crc_saved[(4 - counter)] : 0;
         endcase
 
 endmodule: enc_crc5

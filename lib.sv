@@ -47,6 +47,10 @@
 // Timeout
 `define TIMEOUT_LEN 8'd255
 
+// Residues
+`define CRC16_RESIDUE 16'h800d;
+`define CRC5_RESIDUE  5'b0110;
+
 // Useful Modules
 
 /*
@@ -81,12 +85,6 @@ module crc5(clk, rst_b, en,
         else        lfsr_q <= (en) ? lfsr_c : 5'h1f;
     end
 
-    logic [4:0] crc_last;
-    always_ff @(posedge clk, negedge rst_b) begin
-        if (~rst_b) crc_last <= 0;
-        else        crc_last <= lfsr_q;
-    end
-
     logic bstr_last_avail;
     always_ff @(posedge clk, negedge rst_b) begin
         if (~rst_b) bstr_last_avail <= 0;
@@ -94,7 +92,7 @@ module crc5(clk, rst_b, en,
     end
 
     assign crc_val_avail = (bstr_last_avail && ~bstr_in_avail);
-    assign crc_val = crc_last;
+    assign crc_val = lfsr_q;
 
 endmodule: crc5
 

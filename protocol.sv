@@ -157,7 +157,7 @@ module out_ctrl(clk, rst_b,
     end
 
     assign done = (state == hs && nextState == idle);
-    assign success = (done & data_accepted);
+    assign success = (done & got_ack);
     assign send_token = (state == token);
     assign data_to_enc_avail = (state == token) || (state == data);
 
@@ -188,16 +188,30 @@ module in_ctrl(clk, rst_b,
     logic [7:0] counter;
 
     // STATE TRANSISTIONS
-    enum logic [1:0] {idle  = 2'b00,
-                      token = 2'b01,
-                      data  = 2'b10,
-                      hs    = 2'b11} state, nextState;
+    enum logic [2:0] {idle  = 3'b000,
+                      token = 3'b001,
+                      data  = 3'b010,
+                      hs    = 3'b011,
+                      hold  = 3'b100} state, nextState;
 
     always_comb begin
         case(state)
             idle:  nextState = (start && data_avail) ? token : idle;
-            token: nextState = (pkt_sent) ? data : token;
-            data:  nextState = (pkt_from_dec_avail || timeout) ? hs : data;
+            token: nextState = (pkt_sent) ? hold : token;
+            hold: nextState = data;
+            data: begin
+                if (~timeout) begin
+                    if (pkt_from_dec_avail)
+                        nextState = hs;
+                    else
+                        nextState = data;
+                end else begin
+                    if (retry) 
+                        nextState = data;
+                    else
+                        nextState = hs;
+                end
+            end
             hs:    nextState = (~pkt_sent) ? hs : (retry) ? data : idle;
         endcase
     end
@@ -236,12 +250,12 @@ module in_ctrl(clk, rst_b,
     // pkt_good: 
     always_ff @(posedge clk, negedge rst_b) begin
         if (~rst_b) pkt_good <= 0;
-        else        pkt_good <= ((state == data && ~pkt_from_dec_corrupt) && ~timeout);
+        else        pkt_good <= (state == data && ~pkt_from_dec_corrupt);
     end
 
     // CONTROL SIGNALS
     assign done = (state == hs && nextState == idle);
-    assign success = (done && pkt_good);
+    assign success = (done && pkt_from_dec_avail && ~pkt_from_dec_corrupt);
     assign send_hs = (state == hs);
     assign data_to_enc_avail = (state == hs || state == token);
 
